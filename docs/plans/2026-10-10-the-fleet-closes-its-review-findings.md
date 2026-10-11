@@ -19,6 +19,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-board-writes-no-index`
 - **Started:** 2026-10-11, Jan Wloka, `bug/a-failed-delivery-retries`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-log-reads-the-fresher-file`
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-label-migration-leaves-shell`
 
 ## Changelog
 
