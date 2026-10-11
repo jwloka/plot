@@ -153,7 +153,7 @@ A `bash -x` trace of `--status` (20:20 CEST, load average 19.56) shows two separ
 
 ### The log reads the fresher file
 
-- `bug/the-log-reads-the-fresher-file` — `tick_age_seconds` takes the newer mtime of `fleetd.log` and `registryd.log`, with a test where `fleetd.log` is older; the comments, the restart hint and the units README name `fleetd.err`, the journal and the cleanup; `log-rotation.test.mjs` loses its exact-source match; answers #1443 <!-- builds: freshness choice between the two supervisor logs -->
+- `bug/the-log-reads-the-fresher-file` — `tick_age_seconds` takes the newer mtime of `fleetd.log` and `registryd.log`, with a test where `fleetd.log` is older; the comments, the restart hint and the units README name `fleetd.err`, the journal and the cleanup; `log-rotation.test.mjs` loses its exact-source match; answers #1443 → #1579 <!-- builds: freshness choice between the two supervisor logs -->
 
 ### The label migration leaves shell
 
