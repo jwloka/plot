@@ -12,6 +12,7 @@
 - **Impl:** own branches
 - **Approved:** 2026-10-10, Jan Wloka, plan-PR #1495 merged
 - **Started:** 2026-10-10, Jan Wloka, `bug/a-gone-leader-still-ends-its-group`
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-board-tests-signal-only-their-own-process`
 
 ## Changelog
 
