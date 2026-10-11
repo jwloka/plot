@@ -154,7 +154,7 @@ On 2026-10-10 jwloka moved three findings from `the-controllers-close-their-revi
 
 ### The state gate
 
-- `feature/the-state-gate-is-a-launcher` — `plot-state-gate.sh` becomes a launcher; `stateTransitionRefusal` decides from the `HEAD` and staged `State:` values; `effectivePaths` reads what a commit would carry; a receipt port spends a matching receipt, held to `plot-state-receipt.sh` by a corpus test. Decision count 50 → 49 <!-- builds: stateTransitionRefusal, effectivePaths and a receipt-spend port -->
+- `feature/the-state-gate-is-a-launcher` — `plot-state-gate.sh` becomes a launcher; `stateTransitionRefusal` decides from the `HEAD` and staged `State:` values; `effectivePaths` reads what a commit would carry; a receipt port spends a matching receipt, held to `plot-state-receipt.sh` by a corpus test. Decision count 50 → 49 → #1540 <!-- builds: stateTransitionRefusal, effectivePaths and a receipt-spend port -->
 
 ### The controller gate
 
