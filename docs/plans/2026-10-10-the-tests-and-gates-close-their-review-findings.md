@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** bug
 - **Sprint:** the-gates-and-the-review-findings
 - **Issue:** #1412, #1415, #1433, #1434, #1461, #1473, #1485, #1489
@@ -18,6 +18,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `bug/one-answer-to-which-heads-merged`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-decision-gate-reads-its-table-strictly`
 - **Started:** 2026-10-11, Jan Wloka, `bug/a-bundle-declaration-is-one-build-call`
+- **Delivered:** 2026-10-11
 
 ## Changelog
 
