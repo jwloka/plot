@@ -13,6 +13,7 @@
 - **Impl:** own branches
 - **Approved:** 2026-10-10, Jan Wloka, plan-PR #1494 merged
 - **Started:** 2026-10-10, Jan Wloka, `feature/one-entry-reads-the-hook`
+- **Started:** 2026-10-11, Jan Wloka, `feature/the-brief-name-gate-is-a-launcher`
 
 ## Changelog
 
