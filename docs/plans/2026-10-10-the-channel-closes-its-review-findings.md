@@ -146,7 +146,7 @@ Files: `mods/plot-follow/hooks/follow.tsx`, `packages/domain/src/rules/follow-ch
 
 ### Fleetd wiring tests
 
-- `bug/the-fleetd-wiring-has-tests` — the `prs` beat and the desk relay become one exported function with tests for the hold, the beat order, a null channel and a relay throw; fleetd stops on SIGTERM, retries a failed bind, warns on a swallowed monitor throw, and relays while ticks fail (#1463 M2; #1465 M1, L1, L3; #1467 M1, L2) <!-- builds: an exported prs beat for registryd-main -->
+- `bug/the-fleetd-wiring-has-tests` — the `prs` beat and the desk relay become one exported function with tests for the hold, the beat order, a null channel and a relay throw; fleetd stops on SIGTERM, retries a failed bind, warns on a swallowed monitor throw, and relays while ticks fail (#1463 M2; #1465 M1, L1, L3; #1467 M1, L2) → #1523 <!-- builds: an exported prs beat for registryd-main -->
 
 ### Brief-writer row
 
