@@ -69,14 +69,16 @@ This branch owns:
 - a new or existing board unit test (file TBD — none currently covers `defaultBranchStore`)
 - `packages/board/test/integration/agents-tab.browser.test.ts` (only the L4 wait condition — slice 4 already landed its own changes here)
 
-Other branches in this plan, verified just now:
+Other branches in this plan, re-verified via `gh pr list` on 2026-10-11:
 
-- `bug/a-stale-default-branch-reading-holds-nothing` (slice 1) — not yet pushed to origin (no remote ref found).
-- `bug/the-channel-stamps-what-it-hears` (slice 2) — not yet pushed to origin.
-- `bug/the-fleetd-wiring-has-tests` (slice 3) — recorded `Started` in the plan; not yet pushed to origin as of this check.
+- `bug/a-stale-default-branch-reading-holds-nothing` (slice 1) — **merged**, PR #1505.
+- `bug/the-channel-stamps-what-it-hears` (slice 2) — **merged**, PR #1513.
+- `bug/the-fleetd-wiring-has-tests` (slice 3) — **merged**, PR #1523.
 - `bug/the-brief-writer-row-reads-the-rule` (slice 4) — **merged**, PR #1532.
-- `bug/the-page-hears-the-last-event` (slice 6) — not yet pushed.
-- `bug/the-mod-follows-after-a-reload` (slice 7) — not yet pushed.
+- `bug/the-page-hears-the-last-event` (slice 6) — no PR yet, no branch pushed.
+- `bug/the-mod-follows-after-a-reload` (slice 7) — no PR yet, no branch pushed.
+
+Every wave this one depends on has landed — nothing blocks starting it.
 
 None of these touch this slice's files per the plan's own file-overlap analysis (Notes: "The other slices share no file"). A collision would be a plan error, not an expected risk.
 
