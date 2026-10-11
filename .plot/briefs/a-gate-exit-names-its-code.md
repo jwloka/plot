@@ -6,157 +6,172 @@
 - **Ends as:** one PR to main
 - **Review of the code:** PR
 
-This is the last wave in the plan. All seven waves above it have merged
-into `main`, including "Bundle declaration pairing" (the other slice
-that also touched `scripts/check-decision-count.sh`). Nothing else in
-this plan is still in flight; this branch owns `plot-install-hooks.sh`
-alone.
+This is the last branch in this plan's wave list — no slice merges after
+it, and no branch merges before it is blocked on. All six branches above
+it ("Group signal after exit" through "Bundle declaration pairing") are
+already merged into `main`.
 
 ### What to build
 
-Issue #1485, two findings against `skills/plot/scripts/plot-install-hooks.sh`:
+Issue #1485, against `skills/plot/scripts/plot-install-hooks.sh`'s
+`--verify` path. Two findings, both in the retry logic around
+`drive_gate` (`:279-286`) and its caller (`:409-427`):
 
-1. **L1 — the retry collapses two different exit codes into one generic
-   sentence.** `drive_gate()` (`:279-283`) already reduces any exit ≥128
-   to a single tri-state return of `3` ("ended by a signal"), discarding
-   the real `$rc`. The retry site at `:413` repeats that: `"$prober"
-   "$gp"; rc=$?; [ "$rc" = 3 ] && { "$prober" "$gp"; rc=$?; }` runs the
-   prober twice on a signal-like exit and keeps only the second
-   tri-state code, not the second run's actual process exit. The report
-   line for case `3` (`:421-423`) then prints a fixed sentence — "a
-   signal ended the gate twice" — for every such outcome, including a
-   gate that called `exit 255` on itself deliberately (not killed by a
-   signal at all: 255 is `128 + 127`, which `drive_gate`'s `[ "$rc" -lt
-   128 ]` test cannot tell apart from a real signal's `128 + n`). Change
-   the report line to give the raw exit code of the *second* probe run,
-   for example `"a signal ended the gate twice (exit 255)"` or, for a
-   true signal, `"... (exit 137)"`. That means threading the real `$rc`
-   of the second run through to the report string — `drive_gate` can
-   keep its tri-state return for the `case` dispatch, but the retry site
-   needs the actual number too, not just whether it was ≥128.
-2. **L2 — no test proves a crash-then-recover retry, and `signalStub`
-   cannot produce one.** The two existing signal-path tests
-   (`:595-608`, `:610-624`) only ever make `signalStub` kill the stub
-   process with a real signal (`process.kill(process.pid, 'SIGKILL')`
-   etc.) — it has no mode that calls `process.exit(255)` or any other
-   self-chosen non-2 exit. Add a `signalStub` variant (or a second
-   helper) that exits 0 on its *second* run after a signal on its first
-   — the "it ended once, then answered cleanly" recovery path the
-   comment at `:409-412` describes but no test exercises — and a case
-   where the second run exits with a plain non-signal, non-zero code
-   (e.g. `process.exit(255)`) so the report's new exit-code wording is
-   asserted against a case that is NOT a real signal. `signalStub` also
-   records no working directory today (`:579-593`); extend its log line
-   to capture `process.cwd()` per run so a test can assert the retry
-   actually executed in a second, distinct scratch repo (`new_scratch_repo`
-   at `:262-269` makes a fresh `$scratch/r$RANDOM$$` per probe call) and
-   not the same one twice.
+**L1 — the report line lies about why the gate stopped answering.**
+`drive_gate` returns `3` for *any* exit of 128 or more (`:284-285`,
+`[ "$rc" -lt 128 ] && return 1; return 3`), and the caller's `rc=3`
+branch (`:423`) always prints the same sentence:
+
+```
+unverified  <gate> — a signal ended the gate twice; Claude Code reads that exit as non-blocking, so it permits
+```
+
+That sentence is true for `SIGSEGV` (139), `SIGABRT` (134) or `SIGKILL`
+(137) — a real signal, OS-delivered, no custom script logic involved.
+It is not true for a gate that calls `exit 255` itself: nothing killed
+it, it chose that exit. "A signal ended the gate" asserts a mechanism the
+exit code alone cannot support, and the operator reading the report has
+no way to tell a self-inflicted 255 from an externally-delivered 137
+without rerunning it by hand. The fix: `drive_gate` keeps its three-way
+contract (0 refused, 1 permitted, 3 "ended at 128+") but the report line
+gives the raw exit code instead of asserting a cause — the test
+assertion to match (per the plan's `## Findings`) is wording like
+
+```
+unverified  <gate> — exited 255 twice (128 or more); Claude Code reads that exit as non-blocking, so it permits
+```
+
+i.e. name the number, keep "128 or more" as the category label, drop
+"a signal ended the gate" as a claim. `drive_gate` must therefore pass
+its raw `$rc` out of the function (not just the 0/1/3 classification) so
+the caller can print it — printf it to a scratch file, or have
+`drive_gate` print `3 <rc>` on stdout for the `rc>=128` case and have the
+caller parse the second field. Either mechanism is fine; keep whichever
+reads more like the surrounding script's existing style (`PIPESTATUS`,
+scratch-file capture — see `new_scratch_repo`/`stderr.$$` just above it).
+
+**L2 — no test proves the retry runs in a fresh repository.** The plan's
+own-signal retry comment at `:409-412` ("a signal-ended probe runs once
+more on a fresh repo") is asserted nowhere: the existing
+`--verify reads a gate a signal ended once, then refused, as verified`
+test (`install-hooks.test.mjs:595-608`) proves the *count* of runs (2)
+and the *verdict* (verified), not that the second run happened in a
+different working directory from the first. Add:
+
+1. A test for a signal on the first probe and a **permit** (not a
+   refusal) on the second — currently only "ends once then refuses" and
+   "ends twice" are covered; "ends once then permits" is a third
+   outcome and it is unverified, not verified, because a probe that
+   permitted never demonstrated a refusal.
+2. `signalStub` (`:579-593`) gets a variant that records `process.cwd()`
+   (or equivalent — the gate stub already appends one line per run to a
+   log file; add the cwd to that line) on each run, so a test can assert
+   the two recorded directories differ. Each `new_scratch_repo` call in
+   `plot-install-hooks.sh` (`:263-270`) makes a fresh `$scratch/r$RANDOM$$`
+   directory per probe call — the stub needs to observe that from the
+   outside.
 
 ### The decisions the plan settles — do not re-derive them
 
-**Give the raw code; do not invent a signal-name table.** A plausible
-alternative is mapping 139→SEGV, 134→ABRT, 137→KILL in the report
-string, the way the commit that introduced this wording (`cf9aa79ed`,
-"A gate that crashes twice fails --verify", #1484) talks about these
-exits in its own message and comments. The plan's Design section rejects
-that shape for this finding specifically: ≥128 is NOT always a signal.
-`exit 255` from a gate's own `exit` builtin collides with `128 + 127`
-and has no signal name to show, so a name-table would have to either
-guess wrong or fall back to "unknown" for exactly the case this finding
-is about. The fix the plan commits to is strictly weaker and strictly
-more honest: print the number `drive_gate`'s second probe actually
-returned, and let the reader do what the comment at `:409-412` already
-does in prose — "one is an unknown, two are a crash" — without
-pretending every such number names a `SIG*`.
+**The wording change is the whole fix — no change to the 0/1/3
+contract.** `drive_gate`'s return-code classification (refused / permitted
+/ ended-at-128+) is correct and unchanged by this slice; only the string
+printed in the `rc=3` branch of the caller loop changes, to carry the
+actual exit code instead of a signal claim. Do not touch the `[ "$rc"
+-lt 128 ]` threshold or the retry-once-on-3 control flow at `:413`
+(`"$prober" "$gp"; rc=$?; [ "$rc" = 3 ] && { "$prober" "$gp"; rc=$?; }`).
 
-**`drive_gate`'s tri-state return stays; only the retry site and the
-report string change.** `drive_gate`'s contract (`:279`, "`0` refused,
-`1` permitted, `3` ended by a signal") is read by every prober and the
-whole `case` dispatch at `:414-427` keys off it. Widening `drive_gate`
-itself to return the raw code would ripple into every prober's own
-return contract for no benefit — the `case` only ever needed to know
-"refused / permitted / crash-class", and that three-way split is still
-correct. What was missing is that the *caller* at `:413` throws the
-second run's real `$?` away after computing the tri-state from it. Save
-that raw number in a sibling variable at the retry site and pass only it
-— not `drive_gate`'s tri-state — into the `3)` branch's report string.
+**"128 or more" stays as the category name.** The finding does not ask
+for distinguishing a true signal exit (128+signum, e.g. 137 for SIGKILL)
+from a bare `exit 255` at the classification level — `drive_gate` still
+cannot tell them apart from the exit code alone, and nothing here claims
+otherwise. What changes is only that the report stops *asserting* "a
+signal ended it" when the evidence is silent on that. Printing the raw
+number lets a human reading the report do that inference themselves
+(255 looks deliberate; 137 looks like SIGKILL) instead of the script
+asserting a specific, sometimes-wrong cause.
 
-**Carried over, unchanged: a signal ending a probe once proves nothing;
-twice is the verdict.** The surrounding retry logic (`:409-412`,
-`:595-608`) is the fix for #1478/#1477 and is not in scope here — this
-slice touches only what the second run's exit code says in the report,
-never whether a retry happens or how many times.
+**This branch is under `skills/`, so the shell-line ratchet applies.**
+`scripts/check-shell-lines.sh` compares the shipped line count under
+`skills/` against this branch's merge base. The wording fix is a
+same-line string edit (net zero or near-zero lines); passing the raw
+exit code through likely adds one or two lines to `drive_gate` or its
+caller. If the net change is positive, remove an equal number of lines
+elsewhere in `plot-install-hooks.sh` in the same change — the gate
+stores no number and grants no exemption. Check with
+`scripts/check-shell-lines.sh` (it prints its own usage for a local,
+pre-push run) before opening the PR.
+
+**No slice follows this one.** Unlike every earlier brief in this plan,
+there is no "files the next wave needs untouched" caveat — this is the
+last entry in `## Slices`. The scope guard below is about this branch's
+own blast radius, not about leaving room for a sibling.
+
+**Off-limits files still apply.** The plan's `## Design` section
+reserves every `plot-*-gate.sh` file for the sibling plan
+`the-gates-are-launchers` in the same sprint. `plot-install-hooks.sh`
+itself is not a `*-gate.sh` file — it is the installer/verifier that
+*drives* the gates — so it is this slice's to change. Do not edit any
+`skills/plot/scripts/plot-*-gate.sh` file even if the wording there looks
+related.
 
 ### Done when
 
-The plan's `## Done when` equivalent is its Design section's own
-paragraph for this wave: *"The `unverified` line gives the raw exit
-code, for example 'exited 255 twice (128 or more)'. `signalStub` gets a
-variant that exits 0 on its second run, and records `pwd` so a test
-asserts that the two runs used different directories."* Lift these
-assertions — a fix that only changes the English without threading the
-real exit code would pass today's suite without them:
+The plan's `## Done when` is implicit in its `## Findings that still
+hold` entry for #1485 — both bullets closed:
 
-- A test where the stub exits via a real signal on run 1 and
-  `process.exit(255)` (not a signal) on run 2 — asserts the report names
-  `255`, not a signal name, and that `255` is distinguishable in the
-  output from a true-signal case like `137`.
-- A test where the stub signals on run 1 and exits `0` on run 2 — this
-  is the existing "reads as verified" case (`:595-608`); confirm it
-  still passes unchanged, since the raw-code change must not alter the
-  already-correct non-crash path.
-- A test asserting the two probe runs executed in two different working
-  directories (via the extended `signalStub` log), proving the retry's
-  `new_scratch_repo` call actually produced a fresh scratch repo on the
-  second attempt and not a reused one.
+- The `unverified` line for an `rc=3` outcome names the actual exit code
+  (e.g. "exited 255 twice (128 or more)"), not "a signal ended the gate".
+- `test/reconcile/install-hooks.test.mjs` gains a test for "signal on
+  probe 1, permit on probe 2" (a `verified` or `unverified` outcome
+  distinct from today's two covered cases — work out which verdict is
+  correct from `drive_gate`'s contract: a `1` on the second run means
+  "permitted", which is `unverified`, not `verified` — don't assume it
+  slots into the existing "ends once, refuses" test's expectations), and
+  `signalStub` exposes the working directory per run so a test can
+  assert the two runs used different scratch repositories.
 
-Plus: a `plot` patch changeset (description first, `bumps:` block last —
-see root `CLAUDE.md` § Versioning), since this changes shipped code
-(`plot-install-hooks.sh` ships as-is under `skills/`, not through a
-bundle). Run `node skills/plot/scripts/board/plot-local-checks.mjs` from
-the repo root before each push and run what it prints — it resolves the
-related tests, typecheck and gate scripts for whatever this branch
-actually touches. The suites under the `CI suites` config key run in CI
-on every PR; don't run them locally, and don't list them as a gate here.
-
-Name the shell gate explicitly: `scripts/check-shell-lines.sh` refuses a
-PR whose shell under `skills/` is longer, at merge base, than at HEAD.
-`plot-install-hooks.sh` (549 lines today) **is** under `skills/plot/scripts/`,
-so any net growth here — the new exit-code interpolation in the report
-string, the retry site threading the raw `$rc` through — is paid for in
-the same change: trim equivalent lines elsewhere in this file, or move
-logic into the domain and call it through a bundle, before the PR goes
-up. The gate stores no number and grants no exemption for a declared
-duplicate.
+Plus: a `plot` patch changeset (description first, `bumps:` block last,
+per `CLAUDE.md`'s versioning section) — this slice changes shipped shell
+under `skills/`. Run `node skills/plot/scripts/board/plot-local-checks.mjs`
+before each push and run what it prints — it resolves the tests and
+gates this branch's changed files actually need. The suites in this
+repo's `CI suites` config key run in CI on the PR; do not run them
+locally. Name the shell gate explicitly: `scripts/check-shell-lines.sh`
+refuses a PR whose shipped shell under `skills/` grew past its merge
+base — see the ratchet note above.
 
 ### Bookkeeping
 
-Open the PR through the controller once the branch has its first real
-commit:
+Open the PR through the controller, not `gh pr create`:
 
 ```bash
-skills/plot/scripts/plot-open-pr.sh          # current branch, or
-skills/plot/scripts/plot-open-pr.sh --draft  # while work is still moving
+skills/plot/scripts/plot-open-pr.sh
 ```
 
-It reads this plan, titles the PR from this wave's heading ("Gate exit
-wording"), and puts the plan + this brief in the body. Do not run `gh pr
-create` directly. Once the PR number is known, append `→ #<number>` to
-this branch's line under the plan's `## Slices` → "Gate exit wording"
-heading (currently line 164, no `→ #N` yet) in the same commit or a
-follow-up to the plan file.
+It reads the plan, finds this branch under the "Gate exit wording"
+heading, and opens the PR with that heading as title and the plan plus
+this brief in the body. When it returns the PR number, append `→ #<N>`
+to this branch's line in the plan's `## Slices` section (after "Gate
+exit wording" / `bug/a-gate-exit-names-its-code`), and commit that to the
+plan file on `main`. Push the first real commit as soon as it exists —
+do not wait for the full slice to open the PR.
 
 ### Scope guard
 
-This branch owns `skills/plot/scripts/plot-install-hooks.sh` and
-`test/reconcile/install-hooks.test.mjs`. It does not touch
-`check-decision-count.sh`, `check-shell-lines.sh`, any
-`plot-*-gate.sh` file, or `plot-pr-merged.sh`/`plot-host.sh` — all of
-those belong to waves that have already merged, or to the sibling plan
-`the-gates-are-launchers` per this plan's "Off-limits files" note.
+This branch owns exactly:
 
-No other branch in this plan is still open — every prior wave has
-merged, so there is no live sibling to collide with on this file. If you
-find a change this plan did not anticipate (for example, a third finding
-against `drive_gate` the issue doesn't name), report it rather than
-expanding this slice's scope to cover it.
+- `skills/plot/scripts/plot-install-hooks.sh`
+- `test/reconcile/install-hooks.test.mjs`
+- a new changeset file under `.changeset/`
+
+Nothing else. In particular, do not touch any `plot-*-gate.sh` file (off
+-limits per the plan, owned by the sibling plan `the-gates-are-launchers`
+in the same sprint), `scripts/check-decision-count.sh` or
+`scripts/check-shell-lines.sh` (closed by the already-merged "Decision
+table reading" and "Bundle declaration pairing" waves), or
+`packages/board/src/server/entry/reap.ts` (closed by the already-merged
+"Reaper readings" wave).
+
+If you find something the plan did not anticipate, report it rather than
+improvising outside scope.
