@@ -11,6 +11,7 @@
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-10, Jan Wloka, plan-PR #1497 merged
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-fleetd-wiring-has-tests`
 
 ## Changelog
 
