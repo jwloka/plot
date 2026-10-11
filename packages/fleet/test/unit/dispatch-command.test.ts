@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Scripts } from '@plot-pm/domain';
-import { run } from '../../src/server/entry/dispatch-command.js';
+import { run, runDetached } from '../../src/server/entry/dispatch-command.js';
 import { actionReceiptPath } from '../../src/shared/action-receipt.js';
 import { startDispatch } from '../../src/shared/dispatch-command.js';
-import { IMPLEMENT_COMMAND_KEY } from '../../src/shared/implement-run.js';
+import { IMPLEMENT_COMMAND_KEY, implementStatePath } from '../../src/shared/implement-run.js';
 import { removeTree as rmTree } from '../rm-tree.mjs';
 
 // The dispatch controller with no board: a stub `Implement command` and an
@@ -95,6 +95,82 @@ describe('the dispatch entry', () => {
     expect(await run([], repo, SCRIPT_DIR, {}, () => {}, (s) => warned.push(s))).toBe(2);
     expect(await run(['../etc'], repo, SCRIPT_DIR, {}, () => {}, (s) => warned.push(s))).toBe(2);
     expect(warned.join('')).toContain('usage: plot-dispatch-command.mjs <plan-slug>');
+  });
+});
+
+describe('the detached dispatch entry', () => {
+  it('returns once the state file reads running <pid>, before the process ends', async () => {
+    const out: string[] = [];
+    const code = await runDetached([SLUG], repo, SCRIPT_DIR, {
+      // The launched process has taken the lock and is still running: it never exits.
+      launch: () => {
+        fs.writeFileSync(implementStatePath(repo, SLUG), `running ${process.pid}`);
+        return { pid: process.pid, exitCode: () => null };
+      },
+    }, (s) => out.push(s));
+    expect(code).toBe(0);
+    expect(out.join('')).toContain(`implement started for ${SLUG}: pid ${process.pid}`);
+  });
+
+  it('reports the launch log and its code where the process exits before it started', async () => {
+    const warned: string[] = [];
+    const code = await runDetached([SLUG], repo, SCRIPT_DIR, {
+      launch: (_slug, _root, launchLog) => {
+        fs.writeFileSync(launchLog, 'plot-dispatch-command: implement-running: already\n');
+        return { pid: 1, exitCode: () => 1 };
+      },
+    }, () => {}, (s) => warned.push(s));
+    expect(code).toBe(1);
+    expect(warned.join('')).toContain('implement-running');
+  });
+
+  it('names the launch log by the launching process\'s pid where no launch id is given', async () => {
+    let launchLog = '';
+    await runDetached([SLUG], repo, SCRIPT_DIR, {
+      launch: (_slug, _root, log) => {
+        launchLog = log;
+        return { pid: 1, exitCode: () => 1 };
+      },
+    }, () => {}, () => {});
+    expect(path.basename(launchLog)).toContain(`.launch.${process.pid}.`);
+  });
+
+  it('gives each launch its own log, so a launch that loses the lock leaves the winner\'s log whole', async () => {
+    const logs: string[] = [];
+    const winner = await runDetached([SLUG], repo, SCRIPT_DIR, {
+      launchId: 'first',
+      launch: (_slug, _root, launchLog) => {
+        logs.push(launchLog);
+        fs.writeFileSync(launchLog, 'the winner wrote this\n');
+        fs.writeFileSync(implementStatePath(repo, SLUG), `running ${process.pid}`);
+        return { pid: process.pid, exitCode: () => null };
+      },
+    }, () => {});
+    expect(winner).toBe(0);
+    const warned: string[] = [];
+    const loser = await runDetached([SLUG], repo, SCRIPT_DIR, {
+      launchId: 'second',
+      launch: (_slug, _root, launchLog) => {
+        logs.push(launchLog);
+        fs.writeFileSync(launchLog, 'plot-dispatch-command: implement-running: already\n');
+        return { pid: 1, exitCode: () => 1 };
+      },
+    }, () => {}, (s) => warned.push(s));
+    expect(loser).toBe(1);
+    expect(warned.join('')).toContain('implement-running');
+    expect(logs[0]).not.toBe(logs[1]);
+    expect(fs.readFileSync(logs[0], 'utf8')).toBe('the winner wrote this\n');
+    expect(fs.existsSync(logs[1])).toBe(false);
+  });
+
+  it('gives up where the implement never starts within the wait', async () => {
+    const warned: string[] = [];
+    const code = await runDetached([SLUG], repo, SCRIPT_DIR, {
+      launch: () => ({ pid: 1, exitCode: () => null }),
+      startWaitMs: 100,
+    }, () => {}, (s) => warned.push(s));
+    expect(code).toBe(1);
+    expect(warned.join('')).toMatch(/did not start/);
   });
 });
 

@@ -42,6 +42,8 @@ export interface BoardRunSpec {
   readonly boundSeconds?: number;
   /** The config reader; {@link readConfig} where absent. */
   readonly readCfg?: BoardConfigReader;
+  /** Called with the agent process's pid once the run has started it. */
+  readonly onStarted?: (pid: number) => void;
 }
 
 /** The runs this board process holds: each state file, and its log. */
@@ -232,6 +234,7 @@ export const startBoardRun = async (
       capabilities: [],
       env: spec.env,
       logFile: spec.logFile,
+      onStarted: spec.onStarted,
     })
     .then((result) => {
       if (!result.ok) {
