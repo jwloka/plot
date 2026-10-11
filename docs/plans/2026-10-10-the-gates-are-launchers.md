@@ -16,6 +16,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `feature/the-brief-name-gate-is-a-launcher`
 - **Started:** 2026-10-11, Jan Wloka, `feature/the-state-gate-is-a-launcher`
 - **Started:** 2026-10-11, Jan Wloka, `feature/the-controller-gate-is-a-launcher`
+- **Started:** 2026-10-11, Jan Wloka, `feature/the-phase-gate-is-a-launcher`
 
 ## Changelog
 
