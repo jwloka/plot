@@ -152,7 +152,7 @@ Each slice changes one group of files, and no two slices change the same file. T
 
 ### Decision table reading
 
-- `bug/the-decision-gate-reads-its-table-strictly` — Kind case is normalised and an unknown kind is named, a row with the wrong cell count fails, an absent `before` SHA is fetched or replaced by the first parent, and the report says "not launchers" (issue 1412) <!-- builds: strict table reading in check-decision-count.sh -->
+- `bug/the-decision-gate-reads-its-table-strictly` → #1566 — Kind case is normalised and an unknown kind is named, a row with the wrong cell count fails, an absent `before` SHA is fetched or replaced by the first parent, and the report says "not launchers" (issue 1412) <!-- builds: strict table reading in check-decision-count.sh -->
 
 ### Bundle declaration pairing
 
