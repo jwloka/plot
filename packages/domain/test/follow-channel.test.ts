@@ -5,6 +5,7 @@ import {
   TURNS_PER_DAY,
   TURN_GAP_MS,
   absorbFinding,
+  isRepeat,
   paneLines,
   raisesToast,
   turnGate,
@@ -36,10 +37,12 @@ describe('turnGate', () => {
     expect(actual.state).toMatchObject({ lastStartedAt: T0, count: 1, held: [] });
   });
 
-  it('starts nothing for a finding that is not listed, whatever its name', () => {
+  it('starts nothing for a finding that is not listed, whatever its name, and records it as announced', () => {
     const actual = turnGate(EMPTY_TURN_GATE, finding({ finding: 'pr merged' }), T0, LISTED);
 
-    expect(actual).toEqual({ start: false, text: '', state: EMPTY_TURN_GATE });
+    expect(actual).toMatchObject({ start: false, isNew: true, text: '' });
+    expect(actual.state).toMatchObject({ lastStartedAt: null, count: 0, held: [] });
+    expect(isRepeat(actual.state.announced, finding({ finding: 'pr merged' }))).toBe(true);
   });
 
   it('starts nothing by default: an empty list lists nothing', () => {
@@ -52,7 +55,7 @@ describe('turnGate', () => {
     const third = turnGate(second.state, finding({ branch: 'feature/three' }), T0 + 6 * MIN, LISTED);
 
     expect(second.start).toBe(false);
-    expect(second.state.held).toEqual(['checks failing — feature/two: pull request #1']);
+    expect(second.state.held.map((h) => h.line)).toEqual(['checks failing — feature/two: pull request #1']);
     expect(third.start).toBe(true);
     expect(third.text).toBe(
       [
@@ -70,10 +73,10 @@ describe('turnGate', () => {
     expect(turnGate(held.state, finding({ branch: 'c' }), T0 + TURN_GAP_MS, LISTED).start).toBe(true);
   });
 
-  it('adds a repeated line once', () => {
+  it('adds a repeated line once, when a new reading of the slot reads the same', () => {
     const first = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED);
     const a = turnGate(first.state, finding({ branch: 'b' }), T0 + MIN, LISTED);
-    const b = turnGate(a.state, finding({ branch: 'b' }), T0 + 2 * MIN, LISTED);
+    const b = turnGate(a.state, finding({ branch: 'b', since: '2026-10-10T09:01:00Z' }), T0 + 2 * MIN, LISTED);
 
     expect(b.state.held).toHaveLength(1);
   });
@@ -88,7 +91,7 @@ describe('turnGate', () => {
     }
 
     expect(started).toBe(TURNS_PER_DAY);
-    expect(state.held).toEqual(['checks failing — b24: pull request #1']);
+    expect(state.held.map((h) => h.line)).toEqual(['checks failing — b24: pull request #1']);
 
     const nextDay = Date.UTC(2026, 9, 11, 9, 0, 0);
     const reset = turnGate(state, finding({ branch: 'next' }), nextDay, LISTED);
@@ -104,6 +107,65 @@ describe('turnGate', () => {
     expect(turnGate(reloaded, finding({ branch: 'b' }), T0 + MIN, LISTED).start).toBe(false);
   });
 
+  it('drops the held line of a slot when a clear arrives for it, and keeps the others', () => {
+    const gated: TurnGateState = { ...EMPTY_TURN_GATE, lastStartedAt: T0, day: '2026-10-10', count: 1 };
+    const one = turnGate(gated, finding({ branch: 'one' }), T0 + MIN, LISTED);
+    const two = turnGate(one.state, finding({ branch: 'two' }), T0 + MIN, LISTED);
+    expect(two.state.held).toHaveLength(2);
+
+    const cleared = turnGate(two.state, finding({ branch: 'one', finding: 'clear' }), T0 + 2 * MIN, LISTED);
+
+    expect(cleared.start).toBe(false);
+    expect(cleared.state.held.map((h) => h.line)).toEqual(['checks failing — two: pull request #1']);
+  });
+
+  it('starts no second turn for a reading it announced, even after the pane was emptied by a welcome', () => {
+    // fleetd restarts: the welcome carries `current: []`, the same reading arrives again.
+    const first = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED);
+    const again = turnGate(first.state, finding(), T0 + 6 * MIN, LISTED);
+
+    expect(first.start).toBe(true);
+    expect(again).toEqual({ start: false, isNew: false, text: '', state: first.state });
+  });
+
+  it('starts a turn for a changed reading of an announced slot', () => {
+    const first = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED);
+    const changed = turnGate(first.state, finding({ evidence: 'pull request #2' }), T0 + 6 * MIN, LISTED);
+
+    expect(changed).toMatchObject({ start: true, isNew: true });
+  });
+
+  it('starts no turn and holds no line for a reading another session claimed', () => {
+    const actual = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED, false);
+
+    expect(actual).toMatchObject({ start: false, isNew: true, text: '' });
+    expect(actual.state.held).toEqual([]);
+    expect(actual.state.count).toBe(0);
+    expect(isRepeat(actual.state.announced, finding())).toBe(true);
+  });
+
+  it('forgets the announced reading of a slot on a clear, so the reading counts as new again', () => {
+    const first = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED);
+    const other = turnGate(first.state, finding({ branch: 'other', finding: 'pr merged' }), T0, LISTED);
+    const cleared = turnGate(other.state, finding({ finding: 'clear' }), T0 + MIN, LISTED);
+
+    expect(cleared.isNew).toBe(false);
+    expect(isRepeat(cleared.state.announced, finding())).toBe(false);
+    expect(isRepeat(cleared.state.announced, finding({ branch: 'other', finding: 'pr merged' }))).toBe(true);
+    expect(turnGate(cleared.state, finding(), T0 + 6 * MIN, LISTED).start).toBe(true);
+  });
+
+  it('keeps the announced readings bounded, dropping the oldest slot', () => {
+    let state: TurnGateState = EMPTY_TURN_GATE;
+    for (let i = 0; i < 520; i += 1) {
+      state = turnGate(state, finding({ branch: `b${i}`, finding: 'idle' }), T0, LISTED).state;
+    }
+
+    expect(Object.keys(state.announced)).toHaveLength(500);
+    expect(isRepeat(state.announced, finding({ branch: 'b0', finding: 'idle' }))).toBe(false);
+    expect(isRepeat(state.announced, finding({ branch: 'b519', finding: 'idle' }))).toBe(true);
+  });
+
   it('keeps the held lines bounded', () => {
     let state: TurnGateState = { ...EMPTY_TURN_GATE, lastStartedAt: T0, day: '2026-10-10', count: TURNS_PER_DAY };
     for (let i = 0; i < 80; i += 1) {
@@ -111,7 +173,7 @@ describe('turnGate', () => {
     }
 
     expect(state.held.length).toBeLessThanOrEqual(50);
-    expect(state.held.at(-1)).toContain('b79');
+    expect(state.held.at(-1)?.line).toContain('b79');
   });
 });
 
@@ -151,7 +213,31 @@ describe('absorbFinding', () => {
   });
 });
 
+describe('isRepeat', () => {
+  const announced = turnGate(EMPTY_TURN_GATE, finding(), T0, LISTED).state.announced;
+
+  it('is true for the same slot with the same name, since and evidence', () => {
+    expect(isRepeat(announced, finding())).toBe(true);
+  });
+
+  it('is false for a changed name, evidence or since, another slot, or nothing announced', () => {
+    expect(isRepeat(announced, finding({ finding: 'default branch red' }))).toBe(false);
+    expect(isRepeat(announced, finding({ evidence: 'pull request #2' }))).toBe(false);
+    expect(isRepeat(announced, finding({ since: '2026-10-10T10:00:00Z' }))).toBe(false);
+    expect(isRepeat(announced, finding({ branch: 'other' }))).toBe(false);
+    expect(isRepeat(announced, finding({ monitor: 'AgentMonitor' }))).toBe(false);
+    expect(isRepeat({}, finding())).toBe(false);
+  });
+});
+
 describe('paneLines', () => {
+  it('marks findings heard before a reload as out of date rather than as nothing heard', () => {
+    const lines = paneLines([finding()], false, true);
+
+    expect(lines[0]).toBe('fleet channel: reconnecting, findings may be out of date');
+    expect(lines[1]).toContain('feature/one');
+  });
+
   it('says it has heard nothing before a welcome, never an all-clear', () => {
     expect(paneLines([], false)).toEqual(['fleet channel: nothing heard yet']);
   });
