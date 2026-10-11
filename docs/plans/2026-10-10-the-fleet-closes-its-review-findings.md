@@ -20,6 +20,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `bug/a-failed-delivery-retries`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-log-reads-the-fresher-file`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-label-migration-leaves-shell`
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-unit-runs-its-harness`
 
 ## Changelog
 
