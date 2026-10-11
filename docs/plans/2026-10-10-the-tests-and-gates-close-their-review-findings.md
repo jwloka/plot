@@ -14,6 +14,7 @@
 - **Started:** 2026-10-10, Jan Wloka, `bug/a-gone-leader-still-ends-its-group`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-board-tests-signal-only-their-own-process`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-kill-tests-wait-for-readiness`
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-reaper-reads-what-the-shell-read`
 
 ## Changelog
 
