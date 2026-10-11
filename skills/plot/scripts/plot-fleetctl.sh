@@ -106,10 +106,10 @@ UNIT_DIR="$script_dir/../units"
 # `units/README.md` documents for a second repository.
 unit_name() {
   case "$LABEL" in
-    com.plot-pm.fleetd) printf '%s' plot-fleetd; return ;;
-    com.plot-pm.registryd) printf '%s' plot-registryd; return ;;
+    com.plot-pm.fleetd|com.plot-pm.registryd) printf 'plot-%s' "${LABEL#com.plot-pm.}"; return ;;
     com.plot-pm.fleetd.*) prefix=plot-fleetd rest=${LABEL#com.plot-pm.fleetd.} ;;
-    *) prefix=plot-registryd rest=${LABEL#com.plot-pm.registryd.} ;;
+    com.plot-pm.registryd.*) prefix=plot-registryd rest=${LABEL#com.plot-pm.registryd.} ;;
+    *) prefix=plot-fleetd rest=$LABEL ;;
   esac
   printf '%s-%s' "$prefix" "$(printf '%s' "$rest" | LC_ALL=C tr -c 'A-Za-z0-9:_.-' '-')"
 }
@@ -233,7 +233,7 @@ supervisor_workdir() {
 supervisor_bundle_path() {
   case "$(platform)" in
     launchd) launchctl print "gui/$(id -u)/$LABEL" 2>/dev/null \
-               | awk '/^\targuments = \{/{f=1; next} f && /\.mjs$/{print $1; exit} /^\t\}/{f=0}' ;;
+               | awk '/^\targuments = \{/{f=1; next} f && /\.mjs$/{bundle=$0; sub(/^[ \t]+/, "", bundle); print bundle; exit} /^\t\}/{f=0}' ;;
     systemd) systemctl --user show "$UNIT_NAME" -p ExecStart --value 2>/dev/null \
                | grep -o '[^ ]*\.mjs' | head -1 ;;
   esac
@@ -588,15 +588,27 @@ unload_supervisor() {
   poll_while supervisor_loaded
 }
 
+# A BUNDLE THAT CANNOT BE ASKED IS A BROKEN INSTALLATION. Prints the refusal
+# that names the condition in $1, then the optional lines in $2 (`\n` escapes
+# read), and returns 1.
+broken_install() {
+  printf "plot-fleetctl: %s\n%b  Every bundle is tracked in git, so this is a broken or partial installation of Plot.\n  Reinstall or update the Plot plugin. In a development checkout of Plot, run 'pnpm build:board'.\n" "$1" "${2:-}" >&2
+  return 1
+}
+
 # THE OLD DEFAULT LABEL. `com.plot-pm.registryd` was the default before the
 # rename to `com.plot-pm.fleetd`, and a unit installed under it keeps running
-# under it. Under the new default only, prints `supervisor_checkout`'s answer
-# for a job loaded under the old label, or nothing when none is loaded. A
-# custom label never asks.
-old_label_checkout() {
-  [ "$LABEL" = com.plot-pm.fleetd ] || return 0
-  local LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd
-  ! supervisor_loaded || supervisor_checkout
+# under it. The caller sets LABEL and UNIT_NAME to the old label's, and only
+# under the new default: a custom label never asks. Prints what the old-label
+# rule answers verb $1 (`retire` or `status`) for the loaded job, or nothing
+# when none is loaded. Returns 1 after naming the bundle when the rule cannot
+# be asked.
+old_label_action() {
+  local rule="$script_dir/board/plot-old-label.mjs"
+  supervisor_loaded || return 0
+  supervisor_checkout | node "$rule" "$1" 2>/dev/null && return 0
+  [ -f "$rule" ] || { broken_install "no old-label rule at $rule"; return 1; }
+  broken_install "the old-label rule at $rule gave no answer" "  node on PATH: $(command -v node || echo none)\n"
 }
 
 # Retires a supervisor loaded under the old default label, for `--start`'s
@@ -605,20 +617,17 @@ old_label_checkout() {
 # are removed only once the unload is confirmed. One serving another checkout is
 # that checkout's and is left alone. A dry run names the step and changes
 # nothing. Returns 1 after printing why when the old label is still loaded at
-# the bound, or when which checkout it serves cannot be read.
+# the bound, when which checkout it serves cannot be read, or when the old-label
+# rule cannot be asked.
 retire_old_label() {
-  local served
-  served=$(old_label_checkout)
-  local LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd
-  case "$served" in
-    this\ *) ;;
-    unknown) printf 'plot-fleetctl: '"'"'%s'"'"' (the old default label) is loaded, and which checkout it serves cannot be determined\n  %s names no working directory for it, so it is left loaded and nothing runs beside it.\n  Read it: %s\n' "$LABEL" "$(platform)" "$(read_cmd)" >&2
-             return 1 ;;
-    *) return 0 ;;
-  esac
+  [ "$LABEL" = com.plot-pm.fleetd ] || return 0
+  local action LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd
+  action=$(old_label_action retire) || return 1
+  [ "$action" != refuse ] || { printf "plot-fleetctl: '%s' (the old default label) is loaded, and which checkout it serves cannot be determined\n  %s names no working directory for it, so it is left loaded and nothing runs beside it.\n  Read it: %s\n" "$LABEL" "$(platform)" "$(read_cmd)" >&2; return 1; }
+  [ "$action" = unload-and-remove ] || return 0
   [ "$dry_run" = 0 ] || { echo "would migrate the old label '$LABEL' — it serves this repository: unload it, then remove its unit file"; return 0; }
   echo "plot-fleetctl: unloading the old label '$LABEL' — it serves this repository"
-  unload_supervisor || { printf 'plot-fleetctl: '"'"'%s'"'"' did NOT unload within %ss (the unload exited %s) — it is still loaded\n  Its unit file is kept, so two supervisors would serve one estate. Read it: %s\n' "$LABEL" "$wait_bound" "$unload_rc" "$(read_cmd)" >&2; return 1; }
+  unload_supervisor || { printf "plot-fleetctl: '%s' did NOT unload within %ss (the unload exited %s) — it is still loaded\n  Its unit file is kept, so two supervisors would serve one estate. Read it: %s\n" "$LABEL" "$wait_bound" "$unload_rc" "$(read_cmd)" >&2; return 1; }
   rm -f "$(unit_target)" "$(start_marker)"
   [ "$(platform)" != systemd ] || systemctl --user daemon-reload 2>/dev/null
   echo "  unloaded and removed"
@@ -792,8 +801,8 @@ if [ "$mode" = "status" ]; then
     supervisor_loaded && sup_loaded=0
     # A JOB STILL UNDER THE OLD DEFAULT LABEL IS THIS FLEET'S SUPERVISOR when it
     # serves this checkout, so the reading below is taken from it and says so.
-    [ "$sup_loaded" = 0 ] || case "$(old_label_checkout)" in
-      this\ *) LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd sup_loaded=0 old_note="  under the old label; /plot-fleet --start migrates it" ;;
+    [ "$sup_loaded" = 0 ] || [ "$LABEL" != com.plot-pm.fleetd ] || case "$(LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd old_label_action status)" in
+      note) LABEL=com.plot-pm.registryd UNIT_NAME=plot-registryd sup_loaded=0 old_note="  under the old label; /plot-fleet --start migrates it" ;;
     esac
     [ "$sup_loaded" = 0 ] && sup_pid=$(supervisor_pid)
   fi
@@ -981,10 +990,7 @@ fi
 # --once: the gate
 # ---------------------------------------------------------------------------
 if [ "$mode" = "once" ]; then
-  [ -f "$fleetd" ] || {
-    printf 'plot-fleetctl: no supervisor artifact at %s\n  Every bundle is tracked in git, so this is a broken or partial installation of Plot.\n  Reinstall or update the Plot plugin. In a development checkout of Plot, run '"'"'pnpm build:board'"'"'.\n' "$fleetd" >&2
-    exit 1
-  }
+  [ -f "$fleetd" ] || { broken_install "no supervisor artifact at $fleetd"; exit 1; }
   exec node "$fleetd" --once
 fi
 
@@ -993,10 +999,7 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$mode" = "start" ]; then
   # REFUSAL 1 — nothing to start.
-  [ -f "$fleetd" ] || {
-    printf 'plot-fleetctl: no supervisor artifact at %s\n  The unit would name a file that does not exist.\n  Every bundle is tracked in git, so this is a broken or partial installation of Plot.\n  Reinstall or update the Plot plugin. In a development checkout of Plot, run '"'"'pnpm build:board'"'"'.\n' "$fleetd" >&2
-    exit 1
-  }
+  [ -f "$fleetd" ] || { broken_install "no supervisor artifact at $fleetd" '  The unit would name a file that does not exist.\n'; exit 1; }
 
   # REFUSAL 2 — the wrong node. The unit bakes this path in permanently.
   node_bin=$(command -v node) || {
@@ -1008,12 +1011,12 @@ if [ "$mode" = "start" ]; then
   # "no pin" is exactly how this refusal went silent in every consumer.
   want=$(pinned_major)
   if [ -z "$want" ]; then
-    printf 'plot-fleetctl: cannot read Plot'"'"'s node pin at %s\n  The unit bakes '"'"'%s'"'"' in permanently, and without the pin nothing checks it.\n  Plot tracks .nvmrc in git, so this is a broken or partial installation of Plot.\n  Reinstall or update the Plot plugin, then run this again.\n' "$plot_nvmrc" "$node_bin" >&2
+    printf "plot-fleetctl: cannot read Plot's node pin at %s\n  The unit bakes '%s' in permanently, and without the pin nothing checks it.\n  Plot tracks .nvmrc in git, so this is a broken or partial installation of Plot.\n  Reinstall or update the Plot plugin, then run this again.\n" "$plot_nvmrc" "$node_bin" >&2
     exit 1
   fi
   have=$(running_major) || have=""
   if [ "$have" != "$want" ]; then
-    printf 'plot-fleetctl: node on PATH is %s, Plot pins %s (%s)\n  The unit bakes '"'"'%s'"'"' in permanently, so a wrong one here is a\n  daemon that keeps failing after you have moved on.\n  Fix it: put node %s first on PATH (with nvm: nvm install %s && nvm use %s),\n  then run this again.\n' "${have:-unreadable}" "$want" "$plot_nvmrc" "$node_bin" "$want" "$want" "$want" >&2
+    printf "plot-fleetctl: node on PATH is %s, Plot pins %s (%s)\n  The unit bakes '%s' in permanently, so a wrong one here is a\n  daemon that keeps failing after you have moved on.\n  Fix it: put node %s first on PATH (with nvm: nvm install %s && nvm use %s),\n  then run this again.\n" "${have:-unreadable}" "$want" "$plot_nvmrc" "$node_bin" "$want" "$want" "$want" >&2
     exit 1
   fi
 
@@ -1039,7 +1042,7 @@ if [ "$mode" = "start" ]; then
       else
         harness_reason="PLOT_HARNESS is unset, so the default name 'claude' was looked for."
       fi
-      printf 'plot-fleetctl: cannot resolve the agent harness '"'"'%s'"'"' to a file on PATH\n  %s\n  The unit bakes the harness'"'"'s directory into its PATH permanently, and a\n  worker that cannot find its harness exits 127 after you have moved on.\n  Fix it: put the harness on PATH (or set PLOT_HARNESS to its name or\n  absolute path), check with '"'"'command -v %s'"'"', then run this again.\n' "$harness_name" "$harness_reason" "$harness_name" >&2
+      printf "plot-fleetctl: cannot resolve the agent harness '%s' to a file on PATH\n  %s\n  The unit bakes the harness's directory into its PATH permanently, and a\n  worker that cannot find its harness exits 127 after you have moved on.\n  Fix it: put the harness on PATH (or set PLOT_HARNESS to its name or\n  absolute path), check with 'command -v %s', then run this again.\n" "$harness_name" "$harness_reason" "$harness_name" >&2
       exit 1
       ;;
   esac
@@ -1069,20 +1072,20 @@ if [ "$mode" = "start" ]; then
     served=$(supervisor_checkout)
     case "$served" in
       this\ *)
-        printf 'plot-fleetctl: '"'"'%s'"'"' is already loaded, serving THIS repository (%s)\n  The fleet is already supervised here. See it: /plot-fleet --status\n  To restart it: /plot-fleet --stop, then /plot-fleet --start\n' "$LABEL" "${served#this }" >&2
+        printf "plot-fleetctl: '%s' is already loaded, serving THIS repository (%s)\n  The fleet is already supervised here. See it: /plot-fleet --status\n  To restart it: /plot-fleet --stop, then /plot-fleet --start\n" "$LABEL" "${served#this }" >&2
         ;;
       another\ *)
-        printf 'plot-fleetctl: '"'"'%s'"'"' is already loaded, serving ANOTHER checkout (%s)\n  This repository is %s. That supervisor is not yours to stop.\n  Give this checkout its own label — skills/plot/units/README.md\n' "$LABEL" "${served#another }" "$repo_root" >&2
+        printf "plot-fleetctl: '%s' is already loaded, serving ANOTHER checkout (%s)\n  This repository is %s. That supervisor is not yours to stop.\n  Give this checkout its own label — skills/plot/units/README.md\n" "$LABEL" "${served#another }" "$repo_root" >&2
         ;;
       *)
-        printf 'plot-fleetctl: '"'"'%s'"'"' is already loaded, and which checkout it serves cannot be determined\n  %s names no working directory for it, so it may be another checkout'"'"'s.\n  Read it before stopping it: %s\n  Or, for a second checkout, give it its own label — skills/plot/units/README.md\n' "$LABEL" "$plat" "$(read_cmd)" >&2
+        printf "plot-fleetctl: '%s' is already loaded, and which checkout it serves cannot be determined\n  %s names no working directory for it, so it may be another checkout's.\n  Read it before stopping it: %s\n  Or, for a second checkout, give it its own label — skills/plot/units/README.md\n" "$LABEL" "$plat" "$(read_cmd)" >&2
         ;;
     esac
     exit 1
   fi
 
   if [ "$dry_run" = 1 ]; then
-    printf 'state: %s\nwould fill and load %s (%s)\n  node:      %s (major %s, pinned %s)\n  harness:   %s (on the unit'"'"'s PATH after node'"'"'s directory: %s)\n  fleetd:    %s\n  repo:      %s\nwould then start agents: plot-dispatch.sh --start %s\n' "$(fleet_install_state)" "$LABEL" "$plat" "$node_bin" "$have" "$want" "$harness_bin" "$harness_dir" "$fleetd" "$repo_root" "${start_count:-(default)}"
+    printf "state: %s\nwould fill and load %s (%s)\n  node:      %s (major %s, pinned %s)\n  harness:   %s (on the unit's PATH after node's directory: %s)\n  fleetd:    %s\n  repo:      %s\nwould then start agents: plot-dispatch.sh --start %s\n" "$(fleet_install_state)" "$LABEL" "$plat" "$node_bin" "$have" "$want" "$harness_bin" "$harness_dir" "$fleetd" "$repo_root" "${start_count:-(default)}"
     exit 0
   fi
 
