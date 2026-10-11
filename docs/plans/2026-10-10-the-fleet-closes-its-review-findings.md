@@ -13,6 +13,7 @@
 - **Approved:** 2026-10-10, Jan Wloka, plan-PR #1499 merged
 - **Started:** 2026-10-10, Jan Wloka, `bug/an-unknown-supervisor-keeps-the-scan`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-gate-prints-its-tick`
+- **Started:** 2026-10-11, Jan Wloka, `bug/a-dead-agent-gets-a-fresh-agent`
 
 ## Changelog
 
