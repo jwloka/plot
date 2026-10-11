@@ -17,6 +17,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `bug/a-dead-agent-gets-a-fresh-agent`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-scan-writes-once`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-board-writes-no-index`
+- **Started:** 2026-10-11, Jan Wloka, `bug/a-failed-delivery-retries`
 
 ## Changelog
 
