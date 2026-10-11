@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, utimesSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, utimesSync, readFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, afterEach } from 'vitest';
@@ -9,7 +9,7 @@ import type { PortResult } from '@plot-pm/domain';
 import type { FreshAgentRecord, FreshAgentRecordStore } from '@plot-pm/domain/ports/fresh-agent-record';
 import { ENDING_FILENAME } from '@plot-pm/domain/entities/ending';
 import { DECLARATION_FILENAME } from '@plot-pm/domain/entities/declaration';
-import { freshAgentRecordFile, endingAskRecordFile, deskFs } from '@plot-pm/domain/adapters';
+import { freshAgentRecordFile, endingAskRecordFile, deskFs, agentsFs } from '@plot-pm/domain/adapters';
 import type { Trees } from '@plot-pm/domain/ports/trees';
 import type { PrMergedReading, PrOpenReading } from '@plot-pm/domain/rules/ending-action';
 import type { CommitReading } from '@plot-pm/domain/rules/sample';
@@ -25,13 +25,20 @@ import {
   freshAgentLines,
   markerTextFor,
   prMergedReading,
+  killedWorkerEndings,
+  EXIT_FILENAME,
   type FreshAgentDecision,
   type FreshAgentPorts,
   type FreshAgentAskReads,
   type FreshAgentCandidateReadings,
 } from '../../src/server/entry/registryd.js';
 import { continueOnDesk, type DeskContinuation } from '../../src/shared/continuation.js';
-import { startFreshSession, freshAgentDeskReads } from '../../src/server/entry/registryd-main.js';
+import {
+  startFreshSession,
+  freshAgentDeskReads,
+  startFreshAgents,
+  startNothingDoneReleases,
+} from '../../src/server/entry/registryd-main.js';
 import { markerReading } from '../../src/shared/worker-question.js';
 import { agentsFixture } from '@plot-pm/domain/adapters/agents/agents-fixture';
 
@@ -114,8 +121,14 @@ describe('readFreshAgentCandidates', () => {
     expect(reading?.ending).toBe('corrections-spent');
   });
 
-  it('reads null where no ending was written', async () => {
+  it('reads null where no ending file was written — the tick writes a killed worker\'s ending before it reads', async () => {
     const [reading] = await readFreshAgentCandidates([tree()], () => null, emptyStore, noHeldFiles, noMarker, noAsks);
+    expect(reading?.ending).toBeNull();
+  });
+
+  it('reads null where an ending file exists and does not parse', async () => {
+    const deskFile = (worktree: string, name: string) => (name === ENDING_FILENAME ? 'not json' : null);
+    const [reading] = await readFreshAgentCandidates([tree()], deskFile, emptyStore, noHeldFiles, noMarker, noAsks);
     expect(reading?.ending).toBeNull();
   });
 
@@ -221,9 +234,8 @@ describe('freshAgentDecisions', () => {
   });
 
   it('leaves every other ending alone', () => {
-    // `quiet` stays `leave` deliberately — its cause was fixed on
-    // `bug/a-working-desk-never-reads-free` (#1429), and the plan's Open
-    // Questions do not ask for a row.
+    // `spent` is a finding about the agent, not a stranded session: no row
+    // of the table answers it.
     const [decision] = freshAgentDecisions(
       [
         {
@@ -231,7 +243,7 @@ describe('freshAgentDecisions', () => {
           escalated: false,
           branch: 'feature/x',
           worktree: tree().path,
-          ending: 'quiet',
+          ending: 'spent',
           refusedAssignment: '',
           correctionsText: '',
           runUrl: '',
@@ -454,6 +466,102 @@ const spentReading = (over: Partial<FreshAgentCandidateReadings> = {}): FreshAge
   ...over,
 });
 
+describe('a quiet ending and a killed worker\'s supervisor ending', () => {
+  const supervisorEnding = JSON.stringify({
+    reason: 'unreadable',
+    actor: 'supervisor',
+    branch: 'feature/x',
+    detail: 'the worker exited 143 and wrote no ending',
+  });
+  const killed = async (over: Partial<FreshAgentCandidateReadings> = {}) => {
+    const deskFile = (_w: string, name: string) => (name === ENDING_FILENAME ? supervisorEnding : null);
+    const [reading] = await readFreshAgentCandidates([tree()], deskFile, emptyStore, noHeldFiles, noMarker, noAsks);
+    expect(reading?.ending).toBe('unreadable');
+    return { ...reading!, ...over };
+  };
+
+  it('starts a fresh session for a first quiet ending whose branch holds a commit beyond its claim', () => {
+    const [decision] = freshAgentDecisions([spentReading({ ending: 'quiet', commitBeyondClaim: 'yes' })], 2);
+    expect(decision?.verdict).toBe('start-fresh');
+    expect(decision?.answer).toContain('ended mid-session');
+  });
+
+  it('releases the claim of a quiet ending whose branch holds nothing', () => {
+    const [decision] = freshAgentDecisions([spentReading({ ending: 'quiet', commitBeyondClaim: 'no', prOpen: false })], 2);
+    expect(decision).toMatchObject({ verdict: 'release-claim', releaseBranch: 'feature/x' });
+  });
+
+  it('starts a fresh session for a killed worker whose branch holds a commit beyond its claim', async () => {
+    const [decision] = freshAgentDecisions([await killed({ commitBeyondClaim: 'yes', prMerged: 'not-merged' })], 2);
+    expect(decision?.verdict).toBe('start-fresh');
+  });
+
+  it('asks a person when a killed worker follows a spent fresh session', async () => {
+    const [decision] = freshAgentDecisions([await killed({ commitBeyondClaim: 'yes', priorFreshSessions: 1 })], 2);
+    expect(decision?.verdict).toBe('needs-a-person');
+  });
+
+  it('leaves a killed worker whose PR merged', async () => {
+    const [decision] = freshAgentDecisions([await killed({ commitBeyondClaim: 'yes', prMerged: 'merged' })], 2);
+    expect(decision?.verdict).toBe('leave');
+  });
+
+  it('never releases the claim on a failed read of the branch — absent is not false', async () => {
+    const [decision] = freshAgentDecisions([await killed({ commitBeyondClaim: 'unanswerable', prOpen: 'unanswerable' })], 2);
+    expect(decision?.verdict).toBe('start-fresh');
+  });
+
+  it('asks a person on a second quiet ending, with the second-fresh-session marker', () => {
+    const [decision] = freshAgentDecisions([spentReading({ ending: 'quiet', commitBeyondClaim: 'yes', priorFreshSessions: 1 })], 2);
+    expect(decision).toMatchObject({ verdict: 'needs-a-person', escalate: true });
+    expect(decision?.markerText).toContain('already had its one fresh session (quiet)');
+  });
+
+  it('starts nothing for a desk whose PLOT-BLOCKED marker is still open — the question stays the person\'s', () => {
+    for (const ending of ['bound', 'unreadable', 'quiet'] as const) {
+      const [decision] = freshAgentDecisions([spentReading({ ending, commitBeyondClaim: 'yes', escalated: true })], 2);
+      expect(decision, ending).toMatchObject({ verdict: 'leave', escalate: false, answer: '', releaseBranch: '' });
+    }
+  });
+});
+
+describe('killedWorkerEndings', () => {
+  const desk = (files: Record<string, string>) => (_w: string, name: string) => files[name] ?? null;
+
+  it('names the ending a candidate desk owes for a non-zero exit with no ending and no live loop', () => {
+    const owed = killedWorkerEndings([tree()], desk({ [EXIT_FILENAME]: '143' }), () => false);
+    expect(owed).toEqual([
+      {
+        worktree: tree().path,
+        ending: {
+          reason: 'unreadable',
+          actor: 'supervisor',
+          branch: 'feature/x',
+          detail: 'the worker exited 143 and wrote no ending',
+          refusedAssignment: '',
+        },
+      },
+    ]);
+  });
+
+  it('owes nothing for a stopped desk, a desk cut by hand, a clean exit or a live loop', () => {
+    const stopped = JSON.stringify({ reason: 'stopped', actor: 'operator', branch: 'feature/x', detail: 'plot-dispatch --stop' });
+    expect(killedWorkerEndings([tree()], desk({ [EXIT_FILENAME]: '143', [ENDING_FILENAME]: stopped }), () => false)).toEqual([]);
+    expect(killedWorkerEndings([tree()], desk({}), () => false)).toEqual([]);
+    expect(killedWorkerEndings([tree()], desk({ [EXIT_FILENAME]: '0' }), () => false)).toEqual([]);
+    expect(killedWorkerEndings([tree()], desk({ [EXIT_FILENAME]: '143' }), () => true)).toEqual([]);
+  });
+
+  it('asks about the loop only for a desk whose ending file is absent', () => {
+    const asked: string[] = [];
+    killedWorkerEndings([tree()], desk({ [ENDING_FILENAME]: endingFile('bound') }), (w) => {
+      asked.push(w);
+      return false;
+    });
+    expect(asked).toEqual([]);
+  });
+});
+
 describe('the holding-work readings and decisions', () => {
   const holdingFile = (refusedAssignment: string) =>
     JSON.stringify({ reason: 'holding-work', actor: 'agent', branch: 'feature/x', detail: '', refusedAssignment });
@@ -499,7 +607,7 @@ describe('freshAgentDecisions, escalation', () => {
 
   it('never escalates a first spent budget or an ending that stays leave', () => {
     const decisions = freshAgentDecisions(
-      [spentReading(), spentReading({ ending: 'quiet', priorFreshSessions: 3 })],
+      [spentReading(), spentReading({ ending: 'spent', priorFreshSessions: 3 })],
       2,
     );
     expect(decisions.map((d) => d.escalate)).toEqual([false, false]);
@@ -600,7 +708,7 @@ const rig = (continues: (input: Parameters<FreshAgentPorts['start']>[0]) => Prom
   return { record, asks, world, ports, calls, markedWorktrees, starts, releases, tickOver };
 };
 
-const boundDesk = (reason: 'bound' | 'unreadable' = 'bound') => (_worktree: string, name: string) =>
+const boundDesk = (reason: 'bound' | 'unreadable' | 'quiet' = 'bound') => (_worktree: string, name: string) =>
   name === ENDING_FILENAME ? endingFile(reason) : null;
 
 const spentDesk = () => (_worktree: string, name: string) => {
@@ -842,8 +950,8 @@ describe('the tick starts one fresh session through continue', () => {
   });
 });
 
-describe('a timed-out desk through the tick', () => {
-  for (const reason of ['bound', 'unreadable'] as const) {
+describe('a stranded desk through the tick', () => {
+  for (const reason of ['bound', 'unreadable', 'quiet'] as const) {
     it(`starts one fresh session for a ${reason} desk with a dirty tree and no commit, naming the held files`, async () => {
       const { starts, tickOver, world } = rig(started);
       world.heldFiles = ['a.ts', 'b.ts'];
@@ -907,6 +1015,17 @@ describe('a timed-out desk through the tick', () => {
       expect(releases).toEqual([]);
     });
 
+    it(`starts nothing, releases nothing and rewrites no marker for a ${reason} desk whose PLOT-BLOCKED marker is still open`, async () => {
+      const { starts, releases, calls, asks, markedWorktrees, tickOver, world } = rig(started);
+      world.heldFiles = ['a.ts'];
+      markedWorktrees.add(tree().path);
+      expect(await tickOver(boundDesk(reason))).toEqual([]);
+      expect(starts).toEqual([]);
+      expect(releases).toEqual([]);
+      expect(calls.blockedMarkers).toEqual([]);
+      expect(await asks.asked(PLAN, 'feature/x', '2026-10-05T11:00:00.000Z')).toEqual({ ok: true, value: false });
+    });
+
     it(`does not start a fresh session for a merged ${reason} branch`, async () => {
       const { starts, calls, tickOver, world } = rig(started);
       world.heldFiles = ['a.ts'];
@@ -935,7 +1054,7 @@ describe('a timed-out desk through the tick', () => {
 
 describe('one desk\'s missing marker text', () => {
   it('composes no text for an ending the composer refuses, instead of throwing for the tick', () => {
-    expect(markerTextFor(spentReading({ ending: 'quiet' }))).toBe('');
+    expect(markerTextFor(spentReading({ ending: 'spent' }))).toBe('');
   });
 
   it('reports that desk and still applies the next one', async () => {
@@ -1169,4 +1288,160 @@ describe('continueOnDesk reads endingAsksFreshStart for a bound/unreadable endin
       });
     });
   }
+});
+
+describe('a killed worker and a stopped worker through startFreshSession and continueOnDesk', () => {
+  const roots: string[] = [];
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmTree(root);
+  });
+
+  /** One desk on disk, a private registry and records, and the real start path with `true` as the `Worker command`. */
+  const estate = () => {
+    const root = mkdtempSync(join(tmpdir(), 'plot-killed-desk-'));
+    roots.push(root);
+    const repo = join(root, 'repo');
+    const desk = join(root, 'desk');
+    const manifests = join(root, 'manifests');
+    for (const dir of [repo, desk, manifests]) mkdirSync(dir, { recursive: true });
+    const record = freshAgentRecordFile({ home: root });
+    const asks = endingAskRecordFile({ home: root });
+    const releases: string[] = [];
+    const starts: string[] = [];
+    const reads = freshAgentDeskReads({ repoRoot: repo, scriptDir: '/nonexistent' }, asks, async () => ({ ok: true, value: 'not-merged' }));
+    const opts = { repoRoot: repo, scriptsDir: '/nonexistent', manifestDir: manifests };
+    const ports: FreshAgentPorts = {
+      record,
+      asks,
+      desk: deskFs({} as Trees),
+      now: () => new Date('2026-10-11T12:00:00.000Z'),
+      start: async ({ branch, worktree, answer, beforeStart }) => {
+        starts.push(branch);
+        return startFreshSession(
+          { branch, worktree, answer, main: 'main', beforeStart },
+          {
+            agents: agentsFs({ repoRoot: repo, scriptDir: '/nonexistent' }, { manifestDir: manifests }),
+            command: 'true',
+            newSession: () => `fresh-${starts.length}`,
+            continueDesk: (input) =>
+              continueOnDesk({
+                ...input,
+                readCfg: (_opts, key, fallback) => (key === 'Worker command' ? 'true' : fallback),
+                monitors: { start: () => ({ ok: true, value: { agentMonitorPid: '' } }), stop: () => ({ ok: true }) } as never,
+              }),
+            opts,
+          },
+        );
+      },
+      release: async (branch) => {
+        releases.push(branch);
+        return { released: true, detail: `released ${branch}` };
+      },
+    };
+    const deps = {
+      ...reads,
+      writeEnding: deskFs({} as Trees).writeEnding,
+      record,
+      heldFiles: async () => ['a.ts'],
+      asks: {
+        ...reads.asks,
+        record: asks,
+        prMerged: async () => 'not-merged' as const,
+        commitBeyondClaim: async () => 'yes' as const,
+        prOpen: async () => false,
+      },
+      ports,
+      budget: 2,
+    };
+    const candidate = { ...tree({ path: desk }), registered: false };
+    const report = { incomplete: '', trees: [candidate] } as unknown as Parameters<typeof startFreshAgents>[0];
+    const out: string[] = [];
+    /** One tick of the fresh-agent step and the nothing-done step, in the daemon's order. */
+    const tickOnce = async () => {
+      const fresh = await startFreshAgents(report, deps, (line) => out.push(line), (line) => out.push(line));
+      await startNothingDoneReleases(
+        report,
+        {
+          deskFile: reads.deskFile,
+          ports: {
+            commitBeyondClaim: async () => 'yes',
+            prOpen: async () => false,
+            priorFreshSessions: async () => 0,
+            release: ports.release,
+          },
+        },
+        (line) => out.push(line),
+        (line) => out.push(line),
+      );
+      return fresh;
+    };
+    /** Waits for the spawned `true` to record its exit, so nothing writes into the desk after the test removes it. */
+    const settled = async () => {
+      const deadline = Date.now() + 5_000;
+      while (Date.now() < deadline && !existsSync(join(desk, EXIT_FILENAME))) await new Promise((r) => setTimeout(r, 20));
+      expect(readFileSync(join(desk, EXIT_FILENAME), 'utf8')).toBe('0');
+    };
+    return { desk, manifests, record, starts, releases, out, tickOnce, settled };
+  };
+
+  it('writes the supervisor ending, starts one fresh agent, records one row, and the next tick asks a person instead', async () => {
+    const { desk, manifests, record, starts, releases, out, tickOnce, settled } = estate();
+    writeFileSync(join(desk, EXIT_FILENAME), '143');
+
+    const first = await tickOnce();
+    expect(first.map((a) => a.outcome), out.join('')).toEqual(['started']);
+    expect(JSON.parse(readFileSync(join(desk, ENDING_FILENAME), 'utf8'))).toMatchObject({
+      reason: 'unreadable',
+      actor: 'supervisor',
+      branch: 'feature/x',
+      detail: 'the worker exited 143 and wrote no ending',
+    });
+    expect(out.join('')).toContain('fresh-agent feature/x: recorded — the worker exited 143 and wrote no ending');
+    const rows = await record.rowsFor(PLAN, 'feature/x');
+    expect(rows.ok && rows.value.length).toBe(1);
+    expect(readdirSync(manifests)).toEqual(['fresh-1.json']);
+    await settled();
+
+    // THE FRESH AGENT'S LOOP ENDS: its manifest goes, its exit record stays.
+    rmSync(join(manifests, 'fresh-1.json'));
+    const second = await tickOnce();
+    expect(second.map((a) => a.outcome), out.join('')).toEqual(['escalated']);
+    expect(starts).toHaveLength(1);
+    expect(releases).toEqual([]);
+    expect(readFileSync(join(desk, 'PLOT-BLOCKED.md'), 'utf8')).toContain('already had its one fresh session (unreadable)');
+    const after = await record.rowsFor(PLAN, 'feature/x');
+    expect(after.ok && after.value.length).toBe(1);
+  });
+
+  it('writes no ending while a loop is alive on the desk', async () => {
+    const { desk, starts, tickOnce } = estate();
+    writeFileSync(join(desk, EXIT_FILENAME), '143');
+    writeFileSync(join(desk, '.plot-worker.pid'), String(process.pid));
+    expect(await tickOnce()).toEqual([]);
+    expect(existsSync(join(desk, ENDING_FILENAME))).toBe(false);
+    expect(starts).toEqual([]);
+  });
+
+  it('leaves a desk a person stopped: no fresh agent, no marker, and the claim kept', async () => {
+    const { desk, starts, releases, record, tickOnce } = estate();
+    writeFileSync(join(desk, EXIT_FILENAME), '143');
+    const stopped = '{"reason":"stopped","actor":"operator","branch":"feature/x","detail":"plot-dispatch --stop"}\n';
+    writeFileSync(join(desk, ENDING_FILENAME), stopped);
+    expect(await tickOnce()).toEqual([]);
+    expect(await tickOnce()).toEqual([]);
+    expect(starts).toEqual([]);
+    expect(releases).toEqual([]);
+    expect(existsSync(join(desk, 'PLOT-BLOCKED.md'))).toBe(false);
+    expect(readFileSync(join(desk, ENDING_FILENAME), 'utf8')).toBe(stopped);
+    const rows = await record.rowsFor(PLAN, 'feature/x');
+    expect(rows.ok && rows.value.length).toBe(0);
+  });
+
+  it('leaves a desk cut by hand, which no worker ever ran: no ending written, no release', async () => {
+    const { desk, starts, releases, tickOnce } = estate();
+    expect(await tickOnce()).toEqual([]);
+    expect(existsSync(join(desk, ENDING_FILENAME))).toBe(false);
+    expect(starts).toEqual([]);
+    expect(releases).toEqual([]);
+  });
 });
