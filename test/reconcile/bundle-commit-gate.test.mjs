@@ -119,6 +119,18 @@ test('bundle-commit gate: a new bundle born on this branch prints git rm --cache
   assert.match(r.stderr, /git rm --cached skills\/plot\/scripts\/board\/plot-ninth\.mjs/);
 });
 
+test('bundle-commit gate: a repository with no build.mjs allows a staged bundle', () => {
+  // An adopter vendors the bundles it runs and builds none, so a bundle it
+  // stages is not generated output.
+  const { dir, sh } = repo();
+  sh('git rm -q packages/board/build.mjs && git commit -qm "drop the build"');
+  sh(`git update-ref refs/remotes/origin/main "$(git rev-parse main)"`);
+  writeFileSync(path.join(dir, 'skills/plot/scripts/board/board-server.mjs'), 'vendored update\n');
+  sh('git add -A');
+  const r = run(dir);
+  assert.equal(r.status, 0, `no build.mjs means no generated set (stderr: ${r.stderr})`);
+});
+
 test('bundle-commit gate: a command with no "git commit" is ignored', () => {
   const { dir } = repo({ files: { 'skills/plot/scripts/board/board-server.mjs': 'rebuilt locally\n' } });
   const r = run(dir, 'git status');
