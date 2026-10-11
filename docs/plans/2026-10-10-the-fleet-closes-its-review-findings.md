@@ -172,7 +172,7 @@ A `bash -x` trace of `--status` (20:20 CEST, load average 19.56) shows two separ
 
 ### The docs name fleetd
 
-- `bug/the-docs-name-fleetd` — `plot-registryd` leaves the five current docs, `AGENTS.md` is regenerated, and the four dated measurements say `plot-registryd.mjs (since renamed plot-fleetd.mjs)` and the domain TSDoc says what each export does; `CLAUDE.md` names `pr-refresh.ts` as the one `foldPrIndex` caller; `registryd-main.ts` documents `--dry-run` as it behaves; answers #1438 L1, L2, #1445 L1 (doc), L2, L5 <!-- builds: nothing nameable; text only -->
+- `bug/the-docs-name-fleetd` — `plot-registryd` leaves the five current docs, `AGENTS.md` is regenerated, and the four dated measurements say `plot-registryd.mjs (since renamed plot-fleetd.mjs)` and the domain TSDoc says what each export does; `CLAUDE.md` names `pr-refresh.ts` as the one `foldPrIndex` caller; `registryd-main.ts` documents `--dry-run` as it behaves; answers #1438 L1, L2, #1445 L1 (doc), L2, L5 → #1592 <!-- builds: nothing nameable; text only -->
 
 ## Done when
 
