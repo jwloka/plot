@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** bug
 - **Sprint:** the-gates-and-the-review-findings
 - **Issue:** #1437, #1463, #1465, #1467, #1470, #1476, #1481
@@ -16,6 +16,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-board-builds-the-default-branch-reading`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-page-hears-the-last-event`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-mod-follows-after-a-reload`
+- **Delivered:** 2026-10-11
 
 ## Changelog
 
