@@ -531,6 +531,12 @@ export interface CacheEntry {
   prAt: number | null;
   prError: string | null;
   /**
+   * The bridge `at` the last OWNED refresh applied, or null after a fleet-less
+   * one. An owned refresh that reads the same `at` skips the display reads
+   * (versions, unmerged, questions). It still reads the supervisor.
+   */
+  appliedBridgeAt: number | null;
+  /**
    * What the budget record said this account was spending at the last refresh,
    * in requests an hour, or null where it could not be read.
    *
@@ -1595,17 +1601,6 @@ export async function refreshIssues(opts: BuildBoardOptions, entry: CacheEntry):
   entry.issueError = null;
 }
 
-
-
-
-
-
-
-
-
-
-
-
 const overlays = new WeakMap<CacheEntry, PrIndexStore>();
 
 /** The store a fleet-less board folds into: reads fall through, writes stay in memory. */
@@ -1635,12 +1630,19 @@ const readPrsFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): Pro
   const startedAt = Date.now();
   const backend = await resolveBackend(entry, hostFor(opts));
   const held = await prStoreFor(opts.repoRoot).read(backend);
-  if (held.ok && held.value !== null) {
+  if (!held.ok || held.value === null) {
+    // Nothing to serve and nothing served before: say so rather than keep the
+    // `null` a fleet-less run left, which reads as a healthy reader.
+    if (entry.prAt === null) entry.prError = 'the fleet has left no PR index to read';
+  } else {
     const maps = mapsOfRows(held.value.rows);
     applyPrMaps(entry, maps);
     const at = Date.parse(held.value.at);
     entry.prAt = Number.isNaN(at) ? startedAt : at;
-    entry.prError = null;
+    // The fleet is the one process that asks the host here, so its last failure
+    // is the board's. Carried on the bridge; null where the bridge is absent.
+    const bridge = await fleetStateFor(opts).read();
+    entry.prError = bridge.ok && bridge.value !== null ? bridge.value.prError : null;
     await refreshRuns(opts, entry, maps.prs, await buildPortFor(opts));
   }
   entry.prNextAt = startedAt + PR_REFRESH_MS;
@@ -1649,13 +1651,13 @@ const readPrsFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): Pro
 
 /**
  * Asks the host for pull requests and folds the answer into `store`. The
- * board calls this only where no fleet runs; the store defaults to the real one
- * for a caller that means to write it.
+ * board calls this only where no fleet runs, and names the store it folds into:
+ * a caller that means to write the real one has to say so.
  */
 export const refreshPrs = async (
   opts: BuildBoardOptions,
   entry: CacheEntry,
-  store: PrIndexStore = prStoreFor(opts.repoRoot),
+  store: PrIndexStore,
 ): Promise<void> => {
   const build = await buildPortFor(opts);
   const world: PrWorld = {
@@ -1767,7 +1769,17 @@ export async function refresh(opts: BuildBoardOptions, entry: CacheEntry): Promi
     // The RUN is stored and the verdict derived at render, where the live agent
     // count is. That count is the second half of the prominence rule, and it
     // moves faster than this reading does.
+    const bridge = await fleetStateFor(opts).read();
+    const bridged = bridge.ok ? bridge.value : null;
+    // The supervisor is read on EVERY tick: it is the liveness probe. A stopped
+    // fleet stops moving the bridge `at`, so a skip keyed on that `at` would keep
+    // `supervisor: up` and the scan unowned for up to `OWNED_BRIDGE_MAX_AGE_MS`.
     entry.supervisor = await readSupervisor(opts);
+    // The three display reads below (versions, unmerged, questions) are skipped
+    // on an OWNED tick whose bridge `at` equals the one the last owned tick
+    // applied. A fleet-less tick sets `appliedBridgeAt` to null, so the board
+    // keeps computing them itself there.
+    const sameBridge = bridged !== null && bridged.at === entry.appliedBridgeAt;
     // Default mode, WITH the fetch: the refresh is off the request path, so a
     // second of work is free — and the fetch is what lets the board see
     // branches a remote worker pushed. `--stream` is the only flag added.
@@ -1835,14 +1847,12 @@ export async function refresh(opts: BuildBoardOptions, entry: CacheEntry): Promi
     // Otherwise the board scans for display and writes NOTHING: `record: false`
     // keeps the script from touching the bridge, and the board has no writer
     // of it left, so a hung fleet cannot be corrupted by the board's fallback.
-    const fleetState = fleetStateFor(opts);
-    const bridge = await fleetState.read();
-    const bridged = bridge.ok ? bridge.value : null;
     const owned = bridged !== null && fleetOwnsScan({
       supervisor: entry.supervisor,
       bridgeAt: bridged.at,
       now: Date.now(),
     });
+    const skipDisplay = owned && sameBridge;
     let scanned: ScanResult | null = null;
     if (!owned) {
       scanned = await scanOnce(
@@ -1923,13 +1933,13 @@ export async function refresh(opts: BuildBoardOptions, entry: CacheEntry): Promi
     // THE RELEASE VERSION, from the release branch's own `package.json`. From
     // the REFS for the reason stated one line up: the PR map is on its own
     // timer and is still null at the first git refresh.
-    entry.versions = await releaseVersions(opts);
+    if (!skipDisplay) entry.versions = await releaseVersions(opts);
     // WHICH BRANCHES STILL CARRY WORK, from the refs for the reason stated
     // above: this is a question about git, and the PR map is on its own timer.
     // `complete.main` rather than a literal — the default branch is the pulse's
     // to name, and a repo whose trunk is not `main` must not have every one of
     // its branches read as unmerged.
-    entry.unmerged = await unmergedBranches(opts, complete.main);
+    if (!skipDisplay) entry.unmerged = await unmergedBranches(opts, complete.main);
     // WHAT THE WAITING WORKERS ASKED, read here and nowhere else.
     //
     // After `entry.pulse` is assigned, because the pulse is what says WHICH
@@ -1939,7 +1949,8 @@ export async function refresh(opts: BuildBoardOptions, entry: CacheEntry): Promi
     // Costs nothing on a fleet with no questions in it: `workerQuestions`
     // returns immediately when the pulse names no `waiting` branch with a local
     // worktree, so the ordinary refresh spawns nothing at all.
-    entry.questions = await workerQuestions(parsed);
+    if (!skipDisplay) entry.questions = await workerQuestions(parsed);
+    entry.appliedBridgeAt = owned && bridged !== null ? bridged.at : null;
     entry.at = owned && bridged !== null ? bridged.at : Date.now();
     entry.error = null;
     // THE BOARD WRITES NO BRIDGE. The fleet is its only writer; the board reads
@@ -2012,7 +2023,7 @@ export function freshCacheEntry(): CacheEntry {
     supervisor: undefined,
     // Empty at construction — nothing was dispatched before this process began,
     // and a restart re-derives liveness from git rather than trusting a set.
-    prs: null, prsByNumber: null, prsByHead: null, runs: new Map(), prAt: null, prError: null, prSpendPerHour: null,
+    prs: null, prsByNumber: null, prsByHead: null, runs: new Map(), prAt: null, prError: null, appliedBridgeAt: null, prSpendPerHour: null,
     prResetAt: null, prConcurrency: PR_CONCURRENCY_START,
     prLimit: null, prFullReadFailedAt: null, prPendingReaskStreak: new Map(), prReaskAt: new Map(),
     prLimitBasis: 'unknown',

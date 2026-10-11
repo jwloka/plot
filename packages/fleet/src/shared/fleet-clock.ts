@@ -86,6 +86,9 @@ export const startFleetClock = (
  * @param state - the cost caches, adopted by `scanOnce` on success only.
  * @param now - reads the clock for the bridge's `at`.
  * @param warn - receives a one-line reason when a scan or a write fails.
+ * @param prError - reads the PR reader's last failure sentence, bridged beside
+ *   the pulse. Required: a caller that drops it would bridge `null` while the
+ *   PR reader fails.
  * @param after - runs with the pulse the scan just wrote, on a successful scan
  *   only. A scan that throws or whose bridge write is refused never calls it,
  *   so no automatic write acts on a pulse that did not land.
@@ -97,12 +100,13 @@ export const fleetScan = (
   state: ScanState,
   now: () => number,
   warn: (line: string) => void,
+  prError: () => string | null,
   after?: (pulse: FleetReading) => Promise<void>,
 ): (() => Promise<void>) => async () => {
   let landed: FleetReading | null = null;
   try {
     const result = await scanOnce(world, state, { record: false });
-    if (await writeScan(fleetState, result, now())) landed = result.reading;
+    if (await writeScan(fleetState, result, now(), prError())) landed = result.reading;
     else warn('plot-fleetd: bridge write refused');
   } catch (e) {
     warn(`plot-fleetd: scan failed: ${e instanceof Error ? e.message : String(e)}`);

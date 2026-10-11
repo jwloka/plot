@@ -2088,6 +2088,9 @@ export const run = async (
           freshScanState(),
           () => Date.now(),
           warn,
+          // THE PR READER'S LAST FAILURE rides the bridge beside the pulse:
+          // the board reads it there, because the fleet is the one PR reader.
+          () => prState.prError,
           // THE AUTOMATIC WRITES RUN HERE, on the pulse this scan just wrote
           // and never inside `tick`: a scan that failed calls nothing.
           fleetAutoWrites({ repoRoot, scriptsDir, scripts }, warn),
