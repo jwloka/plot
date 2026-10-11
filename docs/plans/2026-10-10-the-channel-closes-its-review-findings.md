@@ -13,6 +13,7 @@
 - **Approved:** 2026-10-10, Jan Wloka, plan-PR #1497 merged
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-fleetd-wiring-has-tests`
 - **Started:** 2026-10-11, Jan Wloka, `bug/the-brief-writer-row-reads-the-rule`
+- **Started:** 2026-10-11, Jan Wloka, `bug/the-board-builds-the-default-branch-reading`
 
 ## Changelog
 
