@@ -1,10 +1,26 @@
 import fs from 'node:fs';
-import path from 'node:path';
-import { allSlicesConfirmed, allSlicesMerged, type FleetReading, type PlanFile } from '@plot-pm/domain';
+import {
+  deliveryReadings,
+  planAutoDeliver,
+  pruneDelivering,
+  pruneFailures,
+  recordDeliveryFailure,
+  retryVerdict,
+  type AutoDeliverPlan,
+  type DeliveryFailure,
+  type FleetReading,
+} from '@plot-pm/domain';
 import { readConfig } from './config-reader.js';
 import { usableCommand } from './usable-command.js';
 import { deliverLogPath, scriptsOf, type ActOptions } from './action-log.js';
-import { readInFlight, writeInFlight } from './in-flight-store.js';
+import {
+  IN_FLIGHT_RENEW_AFTER_MS,
+  readInFlight,
+  updateDeliverState,
+  writeDeliverState,
+  type InFlightFile,
+  type InFlightReading,
+} from './in-flight-store.js';
 import { recordActionReceipt } from './action-receipt.js';
 import { startBoardRun } from './board-run.js';
 
@@ -119,230 +135,6 @@ export function deliverCommand(opts: ActOptions): string {
 }
 
 /**
- * One plan this pulse says has finished, and the file the delivery will move.
- *
- * The slug is what `plot-deliver.sh` resolves the plan from; `file` is carried
- * only so a log line can name what was delivered.
- */
-export interface AutoDeliverPlan {
-  slug: string;
-  file: string;
-}
-
-/**
- * The plan slug the delivery script will use — the basename with its
- * `YYYY-MM-DD-` prefix and `.md` suffix stripped, the exact spelling
- * `/api/deliver` already sends and `planSlug` in `auto-dispatch.ts` produces.
- *
- * A private twin rather than an import, deliberately kept byte-identical: the
- * two modules are independent actors on the same clock, and a shared helper
- * would make one able to break the other's slug resolution.
- */
-export function planSlug(file: string): string {
-  return path.basename(file).replace(/^\d{4}-\d{2}-\d{2}-/, '').replace(/\.md$/, '');
-}
-
-export interface PlanAutoDeliverInput {
-  /**
-   * Whether the scan that produced this pulse FINISHED.
-   *
-   * Threaded in because `allSlicesMerged` needs it to tell *not merged* from
-   * *not yet known* (#491), and neither is a reason to deliver — but only one
-   * of them is a reason to give up on a plan. Defaults to `true`: a caller
-   * that does not know is a test with a hand-built pulse, where the pulse IS
-   * the whole world and is complete by construction.
-   */
-  complete?: boolean;
-
-  /**
-   * The pulse the scan just landed — every plan's phase AND the merge state of
-   * every branch, which is the whole input this decision takes.
-   *
-   * Read from the pulse rather than from plan files, and that is the same
-   * choice `allSlicesMerged` documents for merge state, extended to the phase.
-   * The scan has just walked the estate; re-reading 150 plan files to learn what
-   * it already reported would put this actor on a different clock from the
-   * measurement it acts on, and the two could then disagree about which plans
-   * exist. `PlanSchema.phase` is `plot-plan-meta.sh`'s own normalization,
-   * so it is the same parser's answer either way.
-   */
-  pulse: FleetReading | null;
-  /** Slugs a delivery has already been started for and not yet confirmed. */
-  inFlight: Set<string>;
-}
-
-/**
- * The join key `allSlicesMerged` takes, built from a pulse plan.
- *
- * `allSlicesMerged` finds its plan by `path.basename(meta.file)`, and a pulse
- * plan's `file` is ALREADY that basename — so this is the identity mapping plus
- * the fields the signature requires. Building it here rather than reading the
- * plan file again is what keeps this actor on the pulse's clock: the function is
- * called with the scan's own answer, not with a second opinion about it.
- */
-function joinKey(file: string): PlanFile {
-  return { file } as PlanFile;
-}
-
-/**
- * Which plans this pulse has FINISHED — the whole decision, and pure.
- *
- * Separated from the act for the reason `auto-dispatch.ts` separates its own:
- * every refusal below is a property worth asserting directly, and asserting it
- * through a spawn would test the stub rather than the rule.
- *
- * Four things must hold, and each is a `Done when` item that exists because a
- * naive implementation would pass without it:
- *
- *  - **The phase is `approved`.** A `draft` plan has not been approved and a
- *    `delivered` one is already answered; `plot-deliver.sh` refuses both, and
- *    spawning it to be refused would put a failure in a log every five seconds.
- *
- *  - **Every non-deferred branch has merged** — `allSlicesMerged`, CALLED and not
- *    reimplemented. This is the gate `/plot-deliver` applies by hand, and an
- *    auto-deliverer that skips it ships the exact refusal Plot exists to
- *    enforce. Calling the shared function rather than re-deriving it is also
- *    what lets a fix to the gate reach this actor without anyone remembering to
- *    copy it.
- *
- *  - **At least one branch actually merged**, and since 2026-09-23 this actor
- *    MEASURES IT rather than inheriting it. Shelved is not finished: delivering
- *    it would record a completion nobody decided, and that call stays with a
- *    person.
- *
- *    This property was always the contract and was enforced by borrowing
- *    `allSlicesMerged`'s `merged > 0` guard. That guard answered a different
- *    question — *does this plan name any work at all* — and could not separate
- *    a plan whose branches were given up from a plan nobody built, so a plan
- *    of only deferred slices was undeliverable BY HAND for the same reason it
- *    was undelivered here. `the-rule-counts-what-was-given-up` fixed the
- *    manual path; this gate keeps the automatic one where it was.
- *
- *    The asymmetry is deliberate. A person delivering an all-deferred plan is
- *    deciding; this path runs on the scan's clock with no switch and no cap,
- *    and chains delivery to a reap and then to `plot-release-refs.sh --yes`,
- *    which deletes refs. Measured 2026-09-22: widening the rule alone would
- *    have auto-delivered two approved plans on the next tick, one of them
- *    carrying three corrections its delivery panel owed to a person.
- *
- *  - **No delivery is already in flight for it.** The scan fires every few
- *    seconds and `plot-deliver.sh` pushes to the default branch; without this,
- *    a plan would be delivered a dozen times over while the first run was still
- *    working. Idempotence makes that harmless, not free.
- *
- * Note what is NOT re-derived: merge state comes from the pulse, never from the
- * plan file, because the plan file carries no merge record and inventing one
- * here would answer a different question than the scan does.
- */
-/**
- * How many of a plan's branches the scan saw MERGE.
- *
- * Deliberately not `allSlicesMerged`'s arithmetic: that rule answers *is this
- * plan finished*, which an all-deferred plan legitimately is. This answers
- * *did anything land here*, which is what separates a delivery a person
- * decided from one this actor would perform unattended.
- *
- * Read from the pulse, never from the plan file. The plan file carries no
- * merge record, and inventing one would answer a different question than the
- * scan does — the same rule the docstring above states for merge state.
- *
- * @param plan - the plan as the pulse reports it.
- * @returns the count of branches in the `merged` state, across every slice.
- */
-const landedBranches = (plan: FleetReading['plans'][number]): number =>
-  plan.slices.reduce(
-    (n, slice) => n + slice.branches.filter((b) => b.state === 'merged').length,
-    0,
-  );
-
-export function planAutoDeliver(input: PlanAutoDeliverInput): AutoDeliverPlan[] {
-  const { pulse, inFlight, complete = true } = input;
-  if (!pulse) return [];
-  const out: AutoDeliverPlan[] = [];
-  for (const plan of pulse.plans) {
-    if (plan.phase.toLowerCase() !== 'approved') continue;
-    const slug = planSlug(plan.file);
-    if (inFlight.has(slug)) continue;
-    // The measurement. It answers `not-merged` for a plan the pulse does not
-    // know and for any unmerged non-deferred branch.
-    //
-    // THE WORD, not truthiness: since #491 this returns
-    // 'merged' | 'not-merged' | 'unknown', and 'unknown' means the scan could
-    // not answer. Auto-delivery acts only on a definite yes — delivering on an
-    // unanswered question is the defect #491 removes, one layer up.
-    //
-    // `allSlicesConfirmed` RATHER THAN `allSlicesMerged`, so a landing only a
-    // merge subject proves reads `unknown` here and no tick starts a delivery.
-    // THAT IS WHAT KEEPS THIS PATH FROM STICKING: without it, a subject-proven
-    // plan reads merged during a throttle, the first tick starts
-    // `plot-deliver.sh`, which asks the host and refuses, and
-    // `pruneDelivering` keeps the slug in `inFlight` while the plan still
-    // reads approved and merged — so no later tick delivers until the board
-    // restarts. With it, nothing enters `inFlight` and the first tick after
-    // the host confirms the merge delivers.
-    if (allSlicesConfirmed(joinKey(plan.file), pulse, complete) !== 'merged') continue;
-
-    // AND AT LEAST ONE BRANCH MUST HAVE LANDED HERE. This gate is narrower
-    // than the rule above on purpose, and the asymmetry is the whole point.
-    //
-    // A plan whose every slice is deferred IS deliverable — that is what
-    // `allSlicesMerged` now says, and it is right for the board's Deliver
-    // control and for `/plot-deliver`, where a person is deciding. It is not
-    // right for THIS path, which runs unattended on the scan's clock with no
-    // switch and no cap, and chains delivery to a reap and then to
-    // `plot-release-refs.sh --yes` — a ref deletion that cannot be undone.
-    //
-    // Measured 2026-09-22, before this gate existed: widening the rule alone
-    // would have auto-delivered two approved plans on the next tick, one of
-    // them `a-failed-tick-must-not-end-the-daemon`, whose delivery panel
-    // refuted it and left three corrections owed to a person. An automatic
-    // path must not resolve a question a person has been asked.
-    //
-    // A deferred branch is work NOT DONE HERE, so nothing about it was
-    // verified on this machine. `landedBranches > 0` is the measurement that
-    // something was: a PR merged, and the scan saw it.
-    if (landedBranches(plan) === 0) continue;
-
-    out.push({ slug, file: plan.file });
-  }
-  return out;
-}
-
-/**
- * Retire the slugs whose delivery has landed, so the set does not grow forever.
- *
- * A plan still reading `approved` with every slice merged is one whose delivery
- * has not taken effect yet — it stays in flight. Anything else is confirmed:
- * either the phase moved (the delivery worked) or the plan stopped being
- * deliverable (a branch reopened, and the next pulse will decide afresh).
- *
- * Returned whole rather than mutated, the cache's one-directional rule.
- */
-export function pruneDelivering(
-  inFlight: Set<string>,
-  pulse: FleetReading | null,
-  complete = true,
-): Set<string> {
-  if (inFlight.size === 0) return inFlight;
-  // A pulse the scan could not land says nothing about whether anything
-  // finished, and "nothing said" is not "confirmed". Holding the set unchanged
-  // keeps a delivery from being started twice across a failed scan.
-  if (!pulse) return inFlight;
-  const stillPending = new Set<string>();
-  for (const plan of pulse.plans) {
-    const slug = planSlug(plan.file);
-    if (!inFlight.has(slug)) continue;
-    if (plan.phase.toLowerCase() !== 'approved') continue; // moved on — confirmed
-    // Same rule, and the distinction matters here: only a definite answer
-    // confirms anything. 'unknown' confirms nothing, so the plan stays in
-    // flight rather than being pruned on silence.
-    if (allSlicesMerged(joinKey(plan.file), pulse, complete) !== 'merged') continue;
-    stillPending.add(slug);
-  }
-  return stillPending;
-}
-
-/**
  * Deliver each finished plan, then reap, then release its refs — and the ORDER
  * is the point, at both links.
  *
@@ -377,13 +169,33 @@ export function pruneDelivering(
  * writes, so an operator reads ONE file whether the delivery was clicked or
  * automatic.
  */
+export interface DeliveryHooks {
+  /** A script delivery came up with this pid. */
+  onStart?: (slug: string, pid: number) => void;
+  /**
+   * The delivery ended. Called exactly once per plan handed in: `ok` is `true`
+   * only for a delivery that exited 0. A log that cannot open, a spawn
+   * `error`, a spawn with no pid and a refused agent run are failures.
+   */
+  onEnd?: (slug: string, ok: boolean) => void;
+}
+
 export function runAutoDeliver(
   opts: ActOptions,
   plans: AutoDeliverPlan[],
+  hooks: DeliveryHooks = {},
 ): string[] {
   const command = deliverCommand(opts);
   const started: string[] = [];
   for (const plan of plans) {
+    // ONE END PER PLAN. A spawn can emit `error` and then `exit`, and an agent
+    // run can refuse through its end record and through its return value.
+    let ended = false;
+    const end = (ok: boolean): void => {
+      if (ended) return;
+      ended = true;
+      hooks.onEnd?.(plan.slug, ok);
+    };
     const log = deliverLogPath(opts.repoRoot, plan.slug);
     let out: number;
     try {
@@ -393,6 +205,7 @@ export function runAutoDeliver(
       out = fs.openSync(log, 'a');
     } catch (err) {
       console.error(`auto-deliver could not open ${log}:`, err);
+      end(false);
       continue;
     }
 
@@ -414,13 +227,20 @@ export function runAutoDeliver(
           `auto-deliver: ${plan.slug} exited ${signal ? `on ${signal}` : code}; ` +
           'not reaping — the delivery refused, so its desks are not finished',
         );
+        // A FAILED DELIVERY LEAVES THE PULSE UNCHANGED (still approved, still
+        // merged), so `pruneDelivering` can never retire its mark. The exit is
+        // the only signal, and the caller's `onEnd` acts on it.
+        end(false);
         return;
       }
       console.log(`auto-deliver: delivered ${plan.slug}; reaping its worktrees`);
+      end(true);
       reap(opts, plan.slug);
     };
-    const onError = (err: Error): void =>
+    const onError = (err: Error): void => {
       console.error('auto-deliver failed to spawn:', err);
+      end(false);
+    };
     // ABOVE BOTH ARMS, because both are this controller acting. The agent arm
     // is the one that needs it most: a spawned `claude -p` inherits these same
     // plugin hooks and runs from the REPOSITORY ROOT, not a desk, so its own
@@ -452,9 +272,20 @@ export function runAutoDeliver(
           statePath: null,
         },
         (record) => onExit(record.code, null),
+      ).then(
+        // A run left to the running board returns `refused` without an end record.
+        (how) => {
+          if (how === 'refused') end(false);
+        },
+        (err: unknown) => {
+          console.error('auto-deliver agent run failed:', err);
+          end(false);
+        },
       );
     } else {
-      scriptsOf(opts).start(DELIVER_SCRIPT, [plan.slug], { log: out, onExit, onError });
+      const run = scriptsOf(opts).start(DELIVER_SCRIPT, [plan.slug], { log: out, onExit, onError });
+      if (run.started) hooks.onStart?.(plan.slug, run.pid);
+      else end(false);
     }
     // The script arm keeps its handle: the EXIT CODE is what the reap waits
     // for. `detached` there keeps a Ctrl-C in the board's terminal off a
@@ -579,13 +410,76 @@ export function maybeAutoDeliver(
 }
 
 /**
- * One delivery pass over the marks on disk: read them, retire the confirmed,
- * mark what is about to start, then start it.
+ * The deliveries this process started and that have not ended, per repository.
  *
- * The marks live in `.plot/state/auto-deliver-in-flight.json` with the
- * dispatch marks' format and 90 s lifetime, so a daemon restart inside that
- * window does not deliver a plan twice. Each pass renews the marks it still
- * holds, so a delivery that outlives 90 s stays marked while it is pending.
+ * A mark is renewed only while its delivery runs: in this set, or under a
+ * recorded pid that is still alive. Held in memory, so a restarted daemon
+ * reads the pid from the file instead.
+ */
+const running = new Map<string, Set<string>>();
+
+const runningIn = (repoRoot: string): Set<string> => {
+  let set = running.get(repoRoot);
+  if (!set) {
+    set = new Set();
+    running.set(repoRoot, set);
+  }
+  return set;
+};
+
+/** Whether `pid` names a live process. EPERM is a live process owned by another user. */
+const pidAlive = (pid: number | undefined): boolean => {
+  if (pid === undefined) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+};
+
+/** Order-independent JSON for a map, so two equal maps compare equal. */
+const canonical = (map: Record<string, unknown>): string =>
+  JSON.stringify(Object.keys(map).sort().map((key) => [key, map[key]]));
+
+/** Whether writing `next` would leave the file as `read` reports it. */
+const sameState = (read: InFlightReading, next: InFlightFile): boolean =>
+  Object.keys(read.expired).length === 0 &&
+  canonical(read.stamps) === canonical(next.marks) &&
+  canonical(read.pids) === canonical(next.pids ?? {}) &&
+  canonical(read.failures) === canonical(next.failures ?? {});
+
+/**
+ * Report a plan whose automatic delivery stopped, in the two places an
+ * operator reads for an automatic delivery: the daemon's log and the plan's
+ * deliver log.
+ */
+const reportStopped = (opts: ActOptions, slug: string, failure: DeliveryFailure): void => {
+  const line =
+    `auto-deliver: ${slug} failed ${failure.count} consecutive deliveries; ` +
+    `stopped retrying — needs a person: run /plot-deliver ${slug}, or change the plan to reset the count`;
+  console.log(line);
+  try {
+    fs.appendFileSync(deliverLogPath(opts.repoRoot, slug), `${line}\n`, 'utf8');
+  } catch {
+    /* the daemon log above still carries the line */
+  }
+};
+
+/**
+ * One delivery pass over the marks on disk: read them, retire the confirmed,
+ * count the lapsed, mark what is about to start, then start it.
+ *
+ * The marks live in `.plot/state/auto-deliver-in-flight.json` with a 180 s
+ * lifetime. A mark is renewed only while its delivery runs, so a mark whose
+ * delivery died outside this process expires and counts as a failed attempt.
+ * A live mark is renewed once it is 80 s old, so a gap of one scan budget
+ * between passes cannot expire it.
+ *
+ * A failed delivery is retried after {@link retryDelayMs} and stops after
+ * {@link AUTO_DELIVER_MAX_FAILURES} consecutive failures; the stop is reported
+ * once, in the daemon log and the plan's deliver log. A success or a change to
+ * the plan's reading resets the count.
  *
  * A mark file that exists and cannot be read starts nothing: the marks are the
  * only evidence that a delivery is running, and a pass blind to them would start
@@ -593,19 +487,81 @@ export function maybeAutoDeliver(
  *
  * @param opts - where the fleet acts.
  * @param pulse - the pulse the scan just wrote.
+ * @param now - epoch milliseconds; the clock of this pass.
  */
-export const runAutoDeliverPass = (opts: ActOptions, pulse: FleetReading | null): void => {
-  const read = readInFlight(opts.repoRoot, Date.now(), 'deliver');
+export const runAutoDeliverPass = (opts: ActOptions, pulse: FleetReading | null, now: number = Date.now()): void => {
+  const read = readInFlight(opts.repoRoot, now, 'deliver');
   if (read.branches === null) {
     console.log(`auto-deliver: cannot read the in-flight record (${read.error}); starting nothing this pass`);
     return;
   }
+  const mine = runningIn(opts.repoRoot);
+  const live = (slug: string): boolean => mine.has(slug) || pidAlive(read.pids[slug]);
   const complete = pulse !== null;
-  const pruned = pruneDelivering(read.branches, pulse, complete);
-  const plans = planAutoDeliver({ pulse, inFlight: pruned, complete });
+  const readings = deliveryReadings(pulse);
+
+  // A LAPSED MARK whose plan still reads approved and merged, with no live
+  // delivery behind it, is a delivery that died where no exit was heard.
+  const lapsed = pruneDelivering(new Set(Object.keys(read.expired)), pulse, complete);
+  const held = new Set([...pruneDelivering(read.branches, pulse, complete), ...[...lapsed].filter(live)]);
+  const failures = pruneFailures(read.failures, pulse);
+  const stopped: string[] = [];
+  for (const slug of lapsed) {
+    if (live(slug)) continue;
+    const reading = readings.get(slug) ?? '';
+    failures[slug] = recordDeliveryFailure(failures[slug], reading, now);
+    if (retryVerdict(failures[slug], reading, now) === 'stopped') stopped.push(slug);
+  }
+
+  const plans = planAutoDeliver({ pulse, inFlight: held, complete, failures, now });
+  const marks: Record<string, number> = {};
+  for (const slug of held) {
+    const at = read.stamps[slug] ?? read.expired[slug];
+    // RENEWED ONLY WHILE THE DELIVERY RUNS. An orphaned mark keeps its stamp
+    // and expires, and the expiry above counts it as a failure.
+    marks[slug] = live(slug) && now - at >= IN_FLIGHT_RENEW_AFTER_MS ? now : at;
+  }
   // MARKED BEFORE THE SPAWN, for the reason auto-dispatch marks first: a crash
   // between the two may over-mark and never under-mark.
-  const markError = writeInFlight(opts.repoRoot, [...pruned, ...plans.map((p) => p.slug)], Date.now(), 'deliver');
+  for (const plan of plans) marks[plan.slug] = now;
+  const pids: Record<string, number> = {};
+  for (const slug of held) if (read.pids[slug] !== undefined) pids[slug] = read.pids[slug];
+  const next: InFlightFile = { marks, pids, failures };
+  // Unchanged: the file already says this, so skip the write.
+  const markError = sameState(read, next) ? '' : writeDeliverState(opts.repoRoot, next);
   if (markError) console.log(`auto-deliver: could not record in-flight marks: ${markError}`);
-  if (plans.length > 0) runAutoDeliver(opts, plans);
+  for (const slug of stopped) reportStopped(opts, slug, failures[slug]);
+  if (plans.length === 0) return;
+
+  for (const plan of plans) mine.add(plan.slug);
+  runAutoDeliver(opts, plans, {
+    onStart: (slug, pid) => {
+      const error = updateDeliverState(opts.repoRoot, (file) => ({ ...file, pids: { ...file.pids, [slug]: pid } }));
+      if (error) console.log(`auto-deliver: could not record the pid for ${slug}: ${error}`);
+    },
+    onEnd: (slug, ok) => {
+      mine.delete(slug);
+      let failure: DeliveryFailure | undefined;
+      const error = updateDeliverState(opts.repoRoot, (file) => {
+        const filePids = { ...file.pids };
+        const fileFailures = { ...file.failures };
+        delete filePids[slug];
+        if (ok) {
+          // A SUCCESS RESETS THE COUNT. The mark stays until the pulse
+          // confirms the delivery, and expires if it never does.
+          delete fileFailures[slug];
+          return { marks: file.marks, pids: filePids, failures: fileFailures };
+        }
+        const fileMarks = { ...file.marks };
+        delete fileMarks[slug];
+        failure = recordDeliveryFailure(fileFailures[slug], readings.get(slug) ?? '', Date.now());
+        fileFailures[slug] = failure;
+        return { marks: fileMarks, pids: filePids, failures: fileFailures };
+      });
+      if (error) console.log(`auto-deliver: could not record the end of ${slug}: ${error}`);
+      if (failure && retryVerdict(failure, failure.reading, failure.lastAt) === 'stopped') {
+        reportStopped(opts, slug, failure);
+      }
+    },
+  });
 };
