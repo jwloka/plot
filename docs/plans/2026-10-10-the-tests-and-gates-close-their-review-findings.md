@@ -142,7 +142,7 @@ Each slice changes one group of files, and no two slices change the same file. T
 
 ### Reaper readings
 
-- `bug/the-reaper-reads-what-the-shell-read` — the dirty-tree kind uses the reap loop's dirt filter, an empty `TMPDIR` sweeps `/tmp`, and ownership reads the uid alone (issue 1433) <!-- builds: desk_dirt filter for the dirty-tree kind in reap.ts -->
+- `bug/the-reaper-reads-what-the-shell-read` → #1547 — the dirty-tree kind uses the reap loop's dirt filter, an empty `TMPDIR` sweeps `/tmp`, and ownership reads the uid alone (issue 1433) <!-- builds: desk_dirt filter for the dirty-tree kind in reap.ts -->
 
 ### Merged heads answer
 
