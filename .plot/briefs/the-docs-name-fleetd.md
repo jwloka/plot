@@ -6,49 +6,55 @@
 - **Ends as:** one PR to `main`
 - **Review of the code:** per repo convention (PR review)
 
-This is the last wave in the plan. All 11 prior waves are merged, most recently `bug/the-unit-runs-its-harness` (#1589, `b8184b92a`). Nothing runs after this one, and this slice shares no file with any of them — it edits docs only.
+All eleven prior waves of this plan are merged (#1514, #1527, #1537, #1541, #1548, #1557, #1560, #1572, #1579, #1583, #1589). This is the last wave. This branch can start clean.
 
 ### What to build
 
-This slice answers #1438 L1, L2 and #1445 L1, L2, L5: five prose fixes, none of them code.
+This slice answers #1438 L1, L2 and #1445 L1, L2, L5 — a text-only wave (the plan's own `<!-- builds: nothing nameable; text only -->` note). Verified fresh against current `main`, not the plan's `c9d63311d` snapshot — several findings have drifted:
 
-**Re-verified against the current tree (2026-10-11), not just the plan's `c9d63311d` baseline, because part of this is already done:**
+**#1438 L1 — `plot-registryd` leaves the five current docs.** Still holds at all five cited locations, verified today:
+- `CLAUDE.md:177` and `AGENTS.md:177` — the skills table row for `plot-fleet/`: `...over \`plot-registryd\` and its agents...` → `plot-fleetd`.
+- `README.md:110` — `**/plot-fleet**...` paragraph: `Starts, stops and reports on \`plot-registryd\` and the agents...` → `plot-fleetd`.
+- `skills/plot-pulse/README.md:13` — `\`/plot-fleet\` is now fleet control...over \`plot-registryd\` and the agents.` → `plot-fleetd`.
 
-1. **#1438 L1 — `plot-registryd` survives in five docs.** Still true today in exactly the five files the plan names, all present-tense descriptions (not dated measurements) — straight rename to `plot-fleetd`, no parenthetical:
-   - `CLAUDE.md:177` — the `plot-fleet/` row of the skills table
-   - `AGENTS.md:177` — the mirrored row (regenerate, don't hand-edit — see Bookkeeping)
-   - `README.md:110` — the `/plot-fleet` paragraph under "The fleet commands"
-   - `skills/plot-pulse/README.md:13` — "over `plot-registryd` and the agents"
-   - `docs/definition-of-done.md:68` — **this one is different.** It's a dated measurement ("Measured on one rebase, 2026-09-05: … `plot-registryd.mjs` took three"), which is #1445 L2's territory, not L1's. Per the plan's own phrasing, dated measurements get `plot-registryd.mjs (since renamed plot-fleetd.mjs)` — not a silent rename, because the measurement was taken against the old binary and a bare rename would misstate what was measured.
+These four are **current-state** descriptions (what the command does today) — rewrite plainly, no historical qualifier.
 
-2. **#1438 L2 — "dated measurements carry the new name."** The plan lists four sites: `.gitattributes:43`, `ci.yml:888`, `scripts/check-bundle-attributes.sh:8`, `test/reconcile/artifact.test.mjs:260`. **Three of these are already fixed** — checked 2026-10-11, none of the three contain `plot-registryd` any more (`ci.yml` has no `registryd` string at all; `check-bundle-attributes.sh` has none; `artifact.test.mjs` has none). Only `.gitattributes:43` still says it, and it's the same dated-measurement case as `definition-of-done.md:68` above: "`plot-registryd.mjs` took three" → `plot-registryd.mjs (since renamed plot-fleetd.mjs)`. Likely cause: an earlier wave (`428dabd94`, "The supervisor is plot-fleetd") already touched the other three incidentally. **Do not assume the other three need no look** — re-grep before editing, in case something regressed since this brief was written; but go in expecting one file, not four.
+**#1438 L2 — dated measurements carry the new name.** `docs/definition-of-done.md:68` is different in kind from the four above: it is a **dated measurement** ("Measured on one rebase, 2026-09-05: ... \`plot-ask.mjs\` took five and \`plot-registryd.mjs\` took three"). That measurement ran *before* the rename — `plot-registryd.mjs` is literally what the file was called that day. Don't silently rewrite it to `plot-fleetd.mjs` (that would misstate what was measured); say `plot-registryd.mjs (since renamed plot-fleetd.mjs)` so the historical fact and the current name both read correctly. This is the one line in this slice that is *not* a plain find-and-replace — the other four are.
 
-3. **#1445 L1 — `--dry-run` starts the scan clock, doc says otherwise.** Check `packages/fleet/src/server/entry/registryd-main.ts` around line 139 (doc) and 1918 (the clock start). On re-check, the TSDoc just above `argsFrom` (now around line 217–229) already documents `--dry-run` as "ACCEPTED AND IGNORED," which reads like it already matches behavior — **but that's a different claim than L1's**. L1 says the clock *starts* under `--dry-run` regardless of the flag; verify whether the doc at line ~139 (a different, earlier comment — the module-level or `main()` one) still claims `--dry-run` suppresses the clock, or omits that it doesn't. If the `argsFrom` doc already covers it accurately, the fix may be nothing more than confirming no other comment in the file contradicts it, or adding one line where the clock is actually started (`:1918`) cross-referencing this behavior.
+Two companion locations the plan's measurement table named under L2 (`.gitattributes:43`, `ci.yml:888`, `scripts/check-bundle-attributes.sh:8`, `test/reconcile/artifact.test.mjs:260`) were already fixed by a sibling wave (`710b4a002`, "The label migration leaves shell") — they all read `plot-fleetd.mjs` plainly now, dated 2026-09-05/06, with no stale name anywhere. **Don't touch them.** `docs/definition-of-done.md:68` is the only survivor of that group, and it needs the opposite treatment (keep the old name, annotate it) rather than the treatment its siblings got (just rename).
 
-4. **#1445 L2 — `CLAUDE.md` names the wrong `foldPrIndex` caller.** `CLAUDE.md:483` and `AGENTS.md:483` currently read: *"`fleet.ts` is the only caller of `foldPrIndex`."* Verified 2026-10-11: this is false today. The only caller is `packages/fleet/src/shared/pr-refresh.ts:1281`. Fix the sentence to name `pr-refresh.ts`, in both `CLAUDE.md` and the regenerated `AGENTS.md` mirror.
+**#1445 L1 — `--dry-run` doc.** Already correct. `registryd-main.ts:143` reads `node skills/plot/scripts/board/plot-fleetd.mjs --dry-run # decide, write nothing`, and the body at `:220-226` and `:1364` documents `--dry-run` as accepted-and-ignored (the tick always decides; `--dry-run` only suppresses the write) accurately against the code at `:247` (`else if (arg === '--dry-run') continue;`). The plan's L1 finding is listed as **holds** against the `c9d63311d` snapshot, but a sibling wave already fixed it. Confirm this reads correctly on your checkout; if it still does, this bullet needs no change — don't invent a diff to satisfy the issue number.
 
-5. **#1445 L5 — domain TSDoc narrates history instead of stating current behavior.** The plan's original evidence pointed at `ports/fleet-state.ts:7,11,65`, `fleet-state-file.ts:12`, `scan-owner.ts:16`. Re-checked 2026-10-11: `ports/fleet-state.ts` already reads cleanly — its comments state current contracts ("ONE WRITER… `plot-fleetd` is the only process that calls `write`") with no registryd-era narration left. `fleet-state-file.ts` also **moved** — it's now `packages/domain/src/adapters/fleet-state/fleet-state-file.ts`, not the flat path the plan names; re-read it at its current location before judging whether line 12 still narrates rather than states. `scan-owner.ts:16` is inside the `ScanOwnerReadings` interface doc block and already reads as a plain field description, not narration. **This finding may already be resolved by an earlier wave's incidental touch, the same way #1438 L2's three sites were** — confirm by reading all three files at their current paths before writing anything; if none narrate, say so in the PR body rather than inventing an edit.
+**#1445 L2 — `CLAUDE.md` names the wrong `foldPrIndex` caller.** Still holds. `CLAUDE.md:483` and `AGENTS.md:483` ("One writer") say `\`fleet.ts\` is the only caller of \`foldPrIndex\``. The real (and only) caller today is `packages/fleet/src/shared/pr-refresh.ts:1281` — not `packages/board/.../fleet.ts`, and not `pr-refresh.ts:1275` as the plan's own cross-reference guesses (wave merges have shifted it by six lines). Grep `foldPrIndex` on your checkout before editing — don't trust either line number verbatim. Fix: name `pr-refresh.ts`, not `fleet.ts`.
 
-### The decision this slice settles — do not re-derive it
+**#1445 L5 — domain TSDoc narrates history.** Narrower than the plan's three citations once re-checked: `fleet-state-file.ts` moved to `packages/domain/src/adapters/fleet-state/fleet-state-file.ts` during a sibling wave, and its line ~12 (`BRIDGE_MAX_AGE_MS`'s doc comment, "Unchanged from the board's own constant") is factual, not narrating — no fix needed there. `scan-owner.ts:16` today is a one-line field doc (`/** Epoch ms the bridged pulse was written, or \`null\` where there is none. */`) — also clean. The live violation is in `packages/domain/src/ports/fleet-state.ts` only, two spots:
+  - `:11` — `**ONE WRITER.** After \`the-fleet-owns-the-scan-and-pr-index\`, \`plot-fleetd\` is the only process that calls \`write\`.` — names a plan slug. State the current invariant instead: `plot-fleetd` is the only process that calls `write`; the board reads and does not write while a fleet is running.
+  - `:65` — `The shape \`pulse-bridge.ts\` defined before this port existed, plus \`prError\`` — narrates what used to define the shape. State what the shape is today: seven fields covering the pulse and the facts read on their own timer, written together on every success.
 
-**A dated measurement keeps its old name with a parenthetical; a present-tense description gets a silent rename.** This is the plan's own distinction (`## Slices`, this heading: "the four dated measurements say `plot-registryd.mjs (since renamed plot-fleetd.mjs)`" vs. "`plot-registryd` leaves the five current docs"). Collapsing the two into one find-and-replace would be wrong for the dated sites — it would make a 2026-09-05 measurement read as if it were taken against a binary that didn't carry that name yet.
+  Re-grep `fleet-state.ts`, `scan-owner.ts` and the adapter file on your checkout before editing — this brief's line numbers are current as of writing it but a merge in flight could shift them.
 
-**Re-verify every finding against the live tree before editing, not just the plan's table.** Three of the plan's four #1438 L2 sites and apparently all of #1445 L5's sites are already fixed by prior waves in this same plan (`428dabd94` and others touched `plot-fleetctl.sh`, the domain's fleet-state files, and build-attribute tooling along the way). The plan's evidence column is a snapshot at `c9d63311d`; this slice runs after eleven other merges. Where a finding is already resolved, note it as such in the PR body rather than re-touching a file that no longer needs it — an edit with no behavior or text change is what `git blame` punishes hardest.
+### The decisions this slice settles — do not re-derive them
 
-**`AGENTS.md` is generated, never hand-edited.** Per `CLAUDE.md`'s own Contributing section: edit `CLAUDE.md`, then run `./scripts/check-agents-md.sh --write` to regenerate the mirror. CI refuses a mirror that differs from what that script produces.
+**This is a find-and-fix-four-plus-annotate-one wave, not a rename sweep.** Three of the plan's cited sites (`.gitattributes`, `ci.yml`, `check-bundle-attributes.sh`, `artifact.test.mjs` — four files, one finding) are already fixed by a merged sibling wave. Re-verifying them costs one grep; re-fixing them produces a no-op diff that still touches the file, which is unneeded churn in a text-only PR.
+
+**`docs/definition-of-done.md:68` keeps the old name on purpose.** The repo's own convention (CLAUDE.md's dated-measurement sections throughout) is that a measurement is dated and true to what it measured; a name that didn't exist yet at measurement time is not retroactively correct to insert. The plan's own wording for this exact line is `plot-registryd.mjs (since renamed plot-fleetd.mjs)` — that phrase is not an existing convention elsewhere in the repo (checked: it appears nowhere but this plan), so it is this slice's wording to introduce, not one to go hunting for.
+
+**`AGENTS.md` is generated, never hand-edited.** Every `CLAUDE.md` fix in this slice (`:177`, `:483`) needs the mirror edit applied by tooling, not by hand: edit `CLAUDE.md` only, then run `./scripts/check-agents-md.sh --write` to regenerate `AGENTS.md`. CI refuses a mirror that differs from a fresh `--write`.
+
+**Re-verify every line number before editing — this wave runs last and absorbs the most drift.** Three of this plan's own findings (`#1445 L1`, two of the three `#1445 L5` citations, four of the five `#1438 L2` citations) were already fixed or moved by the ten sibling waves that merged first. Grep the quoted text, confirm the finding still holds, then fix it — don't trust a line number or a "holds" verdict from the plan's `c9d63311d` snapshot without checking your own checkout first.
 
 ### Done when
 
-The plan's `## Done when` list names no bullet specific to this slice — the slice's own annotation is explicit: `builds: nothing nameable; text only`. This slice's completion is the issue list it answers:
+The plan's `## Done when` list does not name this slice individually — it is the one wave with `<!-- builds: nothing nameable; text only -->`. This slice's own completion is the issue's fix list, re-verified against current `main` rather than the plan's snapshot:
 
-- `plot-registryd` no longer appears in `CLAUDE.md:177`, `README.md:110`, `skills/plot-pulse/README.md:13`, or their generated counterparts — renamed to `plot-fleetd`.
-- `docs/definition-of-done.md:68` and `.gitattributes:43` (if still present) read `plot-registryd.mjs (since renamed plot-fleetd.mjs)`, preserving what was actually measured.
-- `CLAUDE.md:483` / `AGENTS.md:483` name `pr-refresh.ts`, not `fleet.ts`, as the one `foldPrIndex` caller.
-- `registryd-main.ts`'s documentation of `--dry-run` accurately states whether the scan clock starts regardless of the flag.
-- Any domain TSDoc still narrating the registryd→fleetd rename (rather than stating current behavior) is rewritten to state the current contract; where none is found, the PR body says so.
-- `./scripts/check-agents-md.sh --write` has been run and its diff (if any) is committed alongside the `CLAUDE.md` edits.
+- `CLAUDE.md:177` and `README.md:110` and `skills/plot-pulse/README.md:13` name `plot-fleetd`, not `plot-registryd`, as the process `/plot-fleet` starts/stops/reports on.
+- `docs/definition-of-done.md:68` keeps `plot-registryd.mjs` as the measured name and adds `(since renamed plot-fleetd.mjs)` beside it.
+- `CLAUDE.md:483` names `pr-refresh.ts` (verify the exact line on your checkout), not `fleet.ts`, as the one caller of `foldPrIndex`.
+- `packages/domain/src/ports/fleet-state.ts` carries no sentence naming a plan slug or describing what a file "used to" define — only what the port means and returns today.
+- `AGENTS.md` is regenerated via `./scripts/check-agents-md.sh --write` and matches `CLAUDE.md` exactly (CI's own check on this).
+- `node skills/plot/scripts/board/plot-local-checks.mjs` and the commands it prints pass.
 
-Plus: the repo's gates. This slice touches no shippable bundle and no `.sh` file, so `scripts/check-shell-lines.sh` and the bundle-diff gate are not in play — but `./scripts/check-agents-md.sh` (no `--write`) still runs in CI and fails on drift, so run the `--write` form locally first. For tests, run `node skills/plot/scripts/board/plot-local-checks.mjs` from the repo root before each push and run what it prints; the suites in the `CI suites` config key run in CI, and a failure there comes back as a correction. Do not run the full `test:e2e` suite locally — it is CI's gate, not a local one. A changeset is optional for a docs-only PR but still welcome per [Versioning](../../CLAUDE.md#versioning) if any skill-facing wording changed in a way worth a changelog line; this slice touches no skill directory, so it most likely needs none.
+Plus: the repo's gates. This slice touches no shell and no shipped bundle, so `scripts/check-shell-lines.sh` and the bundle-diff gate are unaffected. It does **not** need a changeset per [Versioning](../../CLAUDE.md#versioning) — docs-only text changes to `CLAUDE.md`/`AGENTS.md`/`README.md`/skill `README.md` files aren't a skill or package behavior change; if your editor disagrees and a gate demands one, add the minimal patch-level changeset rather than arguing with the gate. For tests, run `node skills/plot/scripts/board/plot-local-checks.mjs` from the repo root before pushing and run what it prints; the suites in the `CI suites` config key run in CI, and a failure there comes back as a correction. Do not run the full `test:e2e` suite locally.
 
 ### Bookkeeping
 
@@ -64,13 +70,10 @@ Do not run `gh pr create` directly. When the PR is created, append `→ #<number
 ### Scope guard
 
 This branch owns:
-- `CLAUDE.md` (the skills table row, the `foldPrIndex` caller sentence)
-- `AGENTS.md` (regenerated from the above via `./scripts/check-agents-md.sh --write` — never hand-edited)
-- `README.md:110`
-- `skills/plot-pulse/README.md:13`
-- `docs/definition-of-done.md:68`
-- `.gitattributes` (only if the registryd mention is still present — re-check first)
-- `packages/fleet/src/server/entry/registryd-main.ts` (doc comments only, around the `--dry-run` parsing and clock-start logic — no behavior change)
-- Any domain TSDoc file confirmed (not assumed) to still narrate the rename: `packages/domain/src/ports/fleet-state.ts`, `packages/domain/src/adapters/fleet-state/fleet-state-file.ts`, `packages/domain/src/rules/scan-owner.ts`
+- `CLAUDE.md` and its generated mirror `AGENTS.md` (regenerate, never hand-edit the mirror)
+- `README.md`
+- `skills/plot-pulse/README.md`
+- `docs/definition-of-done.md`
+- `packages/domain/src/ports/fleet-state.ts` (TSDoc only — no behavior change)
 
-No other branch is in flight on this plan — this is the last wave. If any of the files above resist a clean docs-only fix because the underlying behavior itself looks wrong (not just mis-described), report that rather than expanding this slice's scope to fix it.
+No other branch in this plan is open concurrently — this is the last wave, and the plan's own file-overlap note (slices 1 and 13 touch `scan-owner.ts`; slices 3, 8, 13 touch `registryd-main.ts`) does not apply to this wave's file set. If you find a sixth site naming `plot-registryd` or a fourth narrating TSDoc comment the plan did not anticipate, report it rather than expanding scope silently — the plan's own finding list is what this slice is scored against.
