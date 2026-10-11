@@ -118,7 +118,7 @@ A `bash -x` trace of `--status` (20:20 CEST, load average 19.56) shows two separ
 
 ### A free agent reads running
 
-- `bug/a-free-agent-reads-running` — a live loop on a desk with `.plot-worker.freewait` reads `running`; `--status`, `--stop`, `--start` and `--restart` take one domain reading of the live agents; answers #1450 <!-- builds: deskLoopAlive as the one live-agent reading for fleetctl and dispatch -->
+- `bug/a-free-agent-reads-running` — a live loop on a desk with `.plot-worker.freewait` reads `running`; `--status`, `--stop`, `--start` and `--restart` take one domain reading of the live agents; answers #1450 → #1527 <!-- builds: deskLoopAlive as the one live-agent reading for fleetctl and dispatch -->
 
 ### The gate prints its tick
 
