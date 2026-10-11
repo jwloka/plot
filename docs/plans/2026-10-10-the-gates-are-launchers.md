@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Delivered
+- **State:** Released
 - **Type:** feature
 - **Sprint:** the-gates-and-the-review-findings
 - **Issue:** #1341, #1449
@@ -18,6 +18,7 @@
 - **Started:** 2026-10-11, Jan Wloka, `feature/the-controller-gate-is-a-launcher`
 - **Started:** 2026-10-11, Jan Wloka, `feature/the-phase-gate-is-a-launcher`
 - **Delivered:** 2026-10-11
+- **Released:** 2026-10-12, v2.26.0
 
 ## Changelog
 
