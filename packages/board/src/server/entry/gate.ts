@@ -167,8 +167,86 @@ const briefNameGate: Gate = {
   onError: 'allow',
 };
 
+/**
+ * `state`: refuses a commit that changes a `State:` line in a plan or sprint
+ * file's `## Status` section unless a receipt from the script that owns the
+ * write clears it.
+ *
+ * `wants` is a pure string test. `ask` reads the index, the working tree's
+ * changes and the show-prefix; `effectivePaths` decides which paths the
+ * commit carries and, for each, whether it takes the staged text or the
+ * working copy (`-a`, `--all` or a chained `git add`, which runs after this
+ * hook). For each path under the plan or sprint directory it reads `HEAD`'s
+ * text and the text the commit takes; `stateTransitionOf` finds a
+ * transition, and only then is the path's receipt spent. A failed config read
+ * throws, which `onError: 'allow'` reports as UNVERIFIED; an unreadable `HEAD`
+ * or index allows. A transition seen with no clearing receipt refuses.
+ */
+const stateGate: Gate = {
+  name: 'state',
+  wants: (command) => command.includes('git commit'),
+  ask: async (command) => {
+    const { refsGit } = await import('@plot-pm/domain/adapters/refs/refs-git');
+    const { scriptsShell } = await import('@plot-pm/domain/adapters/scripts/scripts-shell');
+    const { stateReceiptsFile } = await import('@plot-pm/domain/adapters/state-receipts/state-receipts-file');
+    const { effectivePaths, lifecycleKindOf, stateTransitionOf, stateTransitionRefusal } = await import(
+      '@plot-pm/domain/rules/state-transition'
+    );
+    const { gitBlobOid } = await import('./ladder.js');
+
+    const cwd = process.cwd();
+    const scriptDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    const refs = refsGit({ repoRoot: cwd, scriptDir });
+    const root = await refs.repoRoot();
+    if (!root.ok) return null;
+
+    const scripts = scriptsShell({ repoRoot: cwd, scriptDir });
+    const planDir = await scripts.config('Plan directory', 'docs/plans/');
+    const sprintDir = await scripts.config('Sprint directory', 'docs/sprints/');
+    if (!planDir.ok || !sprintDir.ok) throw new Error('the Plan directory or Sprint directory config read failed');
+
+    const staged = await refs.stagedPaths();
+    const workingChanges = await refs.workingChanges();
+    const showPrefix = await refs.showPrefix();
+    if (!staged.ok) return null;
+    const carried = effectivePaths(
+      {
+        staged: staged.value.map((entry) => entry.path),
+        workingChanges: workingChanges.ok ? workingChanges.value : [],
+        showPrefix: showPrefix.ok ? showPrefix.value : '',
+      },
+      command,
+    );
+
+    const receipts = stateReceiptsFile(root.value, gitBlobOid);
+    const uncleared = [];
+    for (const { path, carries } of carried) {
+      const kind = lifecycleKindOf(path, planDir.value.trim(), sprintDir.value.trim());
+      if (kind === null) continue;
+      let committed: string | null = null;
+      if (carries === 'working') {
+        try {
+          committed = readFileSync(join(root.value, path), 'utf8');
+        } catch {
+          // No working copy: the commit carries a deletion, which is not a transition.
+        }
+      } else {
+        const index = await refs.showFile(':0', path);
+        if (index.ok) committed = index.value;
+      }
+      const head = await refs.showFile('HEAD', path);
+      const transition = stateTransitionOf(path, kind, head.ok ? head.value : null, committed);
+      if (transition === null) continue;
+      const spent = await receipts.spend(path, transition.after);
+      if (!(spent.ok && spent.value)) uncleared.push(transition);
+    }
+    return stateTransitionRefusal(uncleared);
+  },
+  onError: 'allow',
+};
+
 /** The registered gates. */
-export const GATES: readonly Gate[] = [bundleCommitGate, briefNameGate];
+export const GATES: readonly Gate[] = [bundleCommitGate, briefNameGate, stateGate];
 
 /** The exit codes the hook contract reads. */
 export const EXIT = { allow: 0, refuse: 2 } as const;
