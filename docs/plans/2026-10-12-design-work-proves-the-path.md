@@ -181,7 +181,7 @@ The removal is measured: 46 counted lines by the ratchet's own regex (`check-she
 
 ### Confirming the slices
 
-- `feature/the-slices-are-confirmed-after-the-spike` — `approve` refuses `spike-unmerged` from `prMerged` and `slices-unpushed`; the three spike card states, the spike badge from `isSpikeSlice` or the annotation, and *Confirm slices and approve*; `draftPlacement` for `design`; `/plot-approve` step 2b; `/plot-release` step 3 lists a merged spike's changeset as a spike of a Design plan (D16); `skills/plot/SKILL.md` *tracer-bullets* and its `:284` sentence; `bumps:` `plot: patch`, `plot-approve: minor`, `plot-release: minor`, with Model Guidance rows <!-- builds: the spike-unmerged refusal and the spike card states -->
+- `feature/the-slices-are-confirmed-after-the-spike` — `approve` refuses `spike-unmerged` from `prMerged` and `slices-unpushed`; the three spike card states, the spike badge from `isSpikeSlice` or the annotation, and *Confirm slices and approve*; `draftPlacement` for `design`; `/plot-approve` step 2b; `/plot-release` step 3 lists a merged spike's changeset as a spike of a Design plan (D16); `skills/plot/SKILL.md` *tracer-bullets* and its `:284` sentence; `bumps:` `plot: patch`, `plot-approve: minor`, `plot-release: minor`, with Model Guidance rows → #1639 <!-- builds: the spike-unmerged refusal and the spike card states -->
 
 ### The tracer status
 
