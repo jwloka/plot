@@ -9,6 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
+- **Rounds:** 1
 
 ## Changelog
 
@@ -60,6 +61,16 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 ### Open Points
 
 - [ ] How many closed tickets the index holds. The plan default is one full read, then a delta by watermark, with no bound (story Open Point 8).
+- [ ] [Domain] The ticket source. `refreshIssues` reads issues through `issueSource` and `plot-host.sh issue-list` (`fleet.ts:1490`, `rules/issue-source.ts:46-50`), not through the `Tracker` port, and a repo with no `Tracker` key resolves to `trackerNone` (`tracker-resolve.ts:35-44`). This repo declares no `Tracker`, so its Done lane stays empty, and Bitbucket issues get no closed route. — *panel round 1: estate, contradiction, cost and deliverable, all amend*
+- [ ] [Domain] The In progress rule on GitHub. `plot-host.sh:4728-4736` gives every open GitHub issue `statusCategory "To Do"`, so the "no category, named by a plan" row never applies, and the plan does not say that `Issue.statusCategory` exists (`issue.ts:58`). — *panel round 1: estate, deliverable, cost*
+- [ ] [Technical] The index writer and its delta. The PR index writer is fleetd's `pr-refresh.ts:1281`, not `fleet.ts`, and the board switches on `fleetOwnsPrs`, not on file validity. Name the process that folds issues, its cadence, whether the board's own 60 s `issue-list` call stops, and the change to `PR_REQUESTS_PER_REFRESH`. Add an "updated since" read and `updatedAt`, so a reopened ticket is seen, and the periodic full read `DESIGN-index.md:87,167` requires. Keep the answered, unsupported or failed result, so an empty lane does not read as "no issues". — *panel round 1: contradiction, estate, deliverable, cost*
+- [ ] [Technical] The meaning of archived. `transitions/story.ts:216-218` writes `archived:` on every move to `done`, so `storyLane` as written puts every controller-made `done` story in Archived. `derivedStanding` (`:402`) reads archived as "every plan released", and `board.ts:1746,1758` skips `docs/stories/archived/`, so D7's "every archived story" cannot show. State which reading decides; `StoriesTab.tsx:30-38` `COLUMN_OF` already maps a `StoryStanding` to the lanes. — *panel round 1: estate, contradiction*
+- [ ] [UX] The toggle's URL parameter. `?released=1` is also the Planning tab's *Show released* (`the-board-has-three-tabs`), and `App.tsx:633-638` keeps it on a tab switch, so the two toggles become one. — *panel round 1: contradiction (must change); estate, deliverable (Open Point)*
+- [ ] [Performance] The cost of the closed read. A GitHub `closed:>=` search stops at 1000 results, a paginated `gh` read is recorded as one call (`plot-host.sh:3382-3388`), the Jira closed read has no page loop and no project or assignee scope (the open query is scoped at `plot-host.sh:4652-4685`), and every closed issue rides the 4 s `/api/fleet` payload (`App.tsx:32`). The cost juror proposes a 14-day index and an on-demand read when the toggle is on, which bounds story Open Point 8 and keeps D7. — *panel round 1: cost, estate*
+- [ ] [Technical] The open list is capped at 50 (`fleet.ts:190`) against 108 open issues on this repo, and the payload drops tickets a plan names (`fleet.ts:1576`), which make up the In progress lane. — *panel round 1: cost, deliverable, estate*
+- [ ] [Domain] The phase map. D12 has the board build its tab groupings from the declared map, and `storyLane` hard-codes story statuses. Decide whether `storyLane` takes the parsed map from `the-phases-are-declared` as a value, or whether lanes inside Discovery are outside D12. — *panel round 1: moderator, a blind spot the four jurors share*
+- [ ] [Technical] The `waits:` on the closed-issues slice belongs on the lanes slice; only the lanes need the Discovery tab. — *panel round 1: deliverable, contradiction*
+- [ ] [Domain] Smaller points: a Jira ticket resolved without the `Done` category against its category, a `Done` ticket with no resolution date, the invariant between `Issue.open` and `closedAt`, `namedByPlan` with no unknown when plans cannot be read, three plans that widen `Tracker` and `Issue` with no order between them, reuse of `decodePrIndex` and `foldPrIndex`, and the shell-line ratchet a new `plot-host.sh` arm pays. — *panel round 1: deliverable, contradiction, estate, cost*
 
 ## Slices
 

@@ -9,6 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
+- **Rounds:** 1
 
 ## Changelog
 
@@ -62,6 +63,10 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 
 - [ ] The checklist's file name before a version exists. Plan default: `docs/releases/next-checklist.md`, renamed by `/plot-release rc` (story Open Point 11).
 - [ ] Which plans the first run covers. Plan default: Delivered plans only, from the day the slice lands; Released plans are not run (story Open Point 14).
+- [ ] [Estate] The panel gate reads one position per juror file (`rules/panel.ts:162-165`), so the plan must name the gated labels that give each claim its own `supported` or `refuted` before slice 1 fixes the record's shape. — *panel round 1, amend*
+- [ ] [Contradiction] The `## Verification` lines are moderator prose unless a gated output produces them: one panel per claim, one gated label per claim, or a record of one position per plan. — *panel round 1, amend*
+- [ ] [Deliverable] No slice owns the step that folds the jurors' verdicts into one line per claim, nor the rule for jurors who disagree on one claim. — *panel round 1, amend*
+- [ ] [Cost] The plan does not name the command and model the run uses, how the run counts against `Parallel agents`, or a setting that turns verification off, so its cost at about 6 Delivered plans a day cannot be checked. — *panel round 1, amend*
 
 ## Slices
 

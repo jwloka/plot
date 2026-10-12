@@ -9,6 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
+- **Rounds:** 1
 
 ## Changelog
 
@@ -50,6 +51,15 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 - [ ] Where a `Review: pr` plan lives while its spike runs (story Open Point 4). Plan default above.
 - [ ] Delivering a tracer plan with its first dependent, and skipping it in automatic delivery (story Open Point 5).
 - [ ] `Type: tracer` replaces the plan's `feature`, `bug`, `docs` or `infra` type (story Open Point 6).
+- [ ] Panel round 1, all lenses (amend): changing `sliceVerdict` alone does not dispatch a spike. `plangate` (`workflows/dispatch.ts:527-546`), the shell phase gate (`plot-dispatch.sh:2957-2978`), the brief route (`workflows/implement.ts:131-138`) and `phaseGateRefusal` (`rules/phase-gate.ts:185-192`) refuse a `design` plan. Name each gate in `feature/the-spike-is-approved-alone`, with one test per gate for a spike branch and a non-spike branch of one Design plan. The same claim in `the-fleet-writes-the-design` needs the same correction.
+- [ ] Panel round 1, contradiction (amend, HIGH; cost reads it the other way): `workflows/approve.ts:227` takes the channel from `Review:`, so after the plan PR merges at spike approval the second approval takes the `pr` arm and needs no person, against D10. State how the second approval names a reviewer and refuses unattended. Cost proposes to document the `pr` arm instead; that keeps the bypass.
+- [ ] Panel round 1, estate (amend, HIGH): a spike marker exists already. `isSpikeSlice` (`packages/board/src/contract/schema.ts:1488-1521`) reads a `### Spike` or `### Tracer` heading as a spike, and `plot-approve` step 2b with `skills/plot/SKILL.md:282-298` defines a pre-approval tracer path. Choose one marker, say what happens to step 2b and the template's `### Tracer` comment, and correct the Notes line that says no spike marker exists.
+- [ ] Panel round 1, deliverable and cost (amend): the spike readings and the plan type do not reach their readers. `sliceVerdict` gets a three-column TSV (`plot-fleet-scan.sh:4561`, `entry/verdicts.ts:63-92`) with no spike column, and the pulse `PlanSchema` (`entities/fleet.ts:695-713`) has no `type`, so automatic delivery cannot skip a tracer plan. No TypeScript plan parser exists; the reader is `PlanMetaSchema`. Price the shell line ratchet for every script that changes.
+- [ ] Panel round 1, estate (amend): no gate guards the `Spike approved:` write, which opens dispatch. The state gate covers `State:` only (`rules/state-transition.ts:18-29`).
+- [ ] Panel round 1, contradiction (amend): amend Manifesto Principle 2 (`skills/plot/MANIFESTO.md:21-23`) so a recorded spike approval licenses one branch; add `plot-approve-spike.mjs` to the controller gate's `GATED` list (`rules/ci-suite.ts:233-240`) with a receipt; name an `approveSpike` workflow that does the pinned plan-PR merge; read `spike-unmerged` from the host's `mergedAt`; and name the route that carries the slice rewrite into the approval's booking worktree (`workflows/approve.ts:326-331`).
+- [ ] Panel round 1, cost (amend): the spike must be the first slice, or the `sliceVerdicts` fold (`rules/eligible.ts:110-130`) reads it `blocked`. `### The spike and the tracer` holds two branches; give each its own heading.
+- [ ] Panel round 1, estate, deliverable and cost (amend): `proven` needs both `PlanStatusSchema` copies, the sprint counters (`packages/board/src/server/fleet.ts:6387`, `:6465`), a card badge and the *spike not approved* and *spike approved* card states. Delivering a tracer plan with its dependent needs a second state receipt, and the plan must say whether automatic delivery of a dependent carries the tracer plan.
+- [ ] Panel round 1, moderator (blind spot no juror examined): the spike lands code on the default branch while the plan is in Design. State what a release cut in that window does with the spike's changeset, what happens to the spike's code when the plan is dropped or rewritten, and whether the reconcile scan reads a merged slice of a Design plan as drift.
 
 ## Slices
 

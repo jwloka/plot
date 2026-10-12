@@ -9,6 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
+- **Rounds:** 1
 
 ## Changelog
 
@@ -58,6 +59,18 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 - [ ] The key name `Workflow phases` and its grammar are this plan's proposal (story Open Point 1).
 - [ ] A declared phase outside the five default names gets no leadership badge (story Open Point 2).
 - [ ] A custom map that puts a story status into a plan phase: the Discovery tab lists every story, and the Planning tab lists plans only (story Open Point 3). This plan builds the map; `the-board-has-three-tabs` builds the tabs.
+- [ ] Panel 2026-10-12 (estate, cost): the board tests phase names as literals, and no slice owns those sites. `PlanCard.tsx:83-85` `isDraft` is `card.phase === 'Discovery'`, so under the default map the Approve and Interrogate controls (`PlanCard.tsx:543`, `:548`, `menus.tsx`) leave every Draft card. Other sites: `board.ts:1165` `phaseDateOf`, `board.ts:2204`, `Board.tsx:217` and `Swimlanes.tsx:161` (unguarded `PHASE_LEADERSHIP[phase]`, which throws for a phase outside the five), `Board.tsx:224`, `App.tsx:877`, `fleet.ts:5842` (an `idea/` row reads Discovery, against D1), `mock-fleet.ts`. 27 test files hold a `'Discovery'` literal, 21 of them browser tests.
+- [ ] Panel 2026-10-12 (all four lenses): the wire schema has three `z.enum(BOARD_PHASES)` fields, `schema.ts:425`, `:736` and `:2486`. The Design section names one.
+- [ ] Panel 2026-10-12 (all four lenses): `owningCommand` (`state-transition.ts:93-104`) only builds the refusal text; the receipt admits the write (`gate.ts:248-253`). *Needs design* also needs `ControllerAction` (`controller-gate.ts:11`), the action regex (`controller-gate.ts:50`) and `_action_of` (`plot-state-receipt.sh:173-180`), and the shell edit pays lines under `check-shell-lines.sh` (cost).
+- [ ] Panel 2026-10-12 (deliverable, estate, contradiction): `storyPhase` has no production caller (`rules/phase.ts:72` only), so `phaseOfStory` has no consumer here and Changelog bullet 2 ships an empty Discovery column until `tickets-and-stories-have-lanes` lands. Released plan `2026-08-16-board-shows-discovery.md` fixed an always-empty Discovery column before. The Motivation line about `storyPhase` overstates its reach.
+- [ ] Panel 2026-10-12 (deliverable, cost): slice 1 moves the board callers of `toBoardPhase` and `rowPhase` (`board.ts:2079`, `:2082`, `:2115`, `fleet.ts:2269`, `:5463`) with `DEFAULT_PHASE_MAP`, so the visible Draft-to-Design move lands in wave 1, not wave 2. "`BOARD_PHASES` stops being the source" in slice 1 conflicts with slice 2 owning the wire schema and the `Phase` type. `StoryModal.tsx:84`, `phaseOrder` and `WORKFLOW` (`workflow.ts:80`, `:178-186`) have no slice.
+- [ ] Panel 2026-10-12 (deliverable, contradiction): `rowPhase` takes no `planStatus` today (`phase.ts:99-104`); giving it one auto-bumps per-branch rows, which only cards do now. A map with no phase holding `plan:delivered` drops the auto-bumped card (`board.ts:2115`).
+- [ ] Panel 2026-10-12 (contradiction, estate): the third `/plot-idea` question contradicts "two independent questions" (`MANIFESTO.md:79`, the plot-idea frontmatter, the CLAUDE.md row) and declares no unattended behaviour (`plot-idea/SKILL.md:58`), so a model can answer what D3 gives a person. The board's idea prompt says "Stop at Draft" (`idea.ts:279`).
+- [ ] Panel 2026-10-12 (contradiction): `phaseWorkflows` places a workflow by the state it moves a plan out of, which contradicts `entities/workflow.ts:126-137` and gives no answer for `dispatch` and `implement`.
+- [ ] Panel 2026-10-12 (contradiction, cost, deliverable): the prose slice must keep plan states apart from declared phases (`MANIFESTO.md:101-109` names the fourth activity Endgame; `skills/plot/SKILL.md:182` contradicts D1), add `Design` as a plan state, cover the CLAUDE.md controller-endpoint list and the state gate's script list, carry a Changelog bullet and regenerate `AGENTS.md`. The Motivation claim that `DESIGN-plan.md` §4 and `DESIGN-story.md` §4 describe four phases is false (`DESIGN-plan.md:750-755` already names five), and the cited ranges end at `:900` and `:622`.
+- [ ] Panel 2026-10-12 (estate): `parseLocalChecks` skips a bad entry silently, so "the shape follows `rules/local-checks.ts`" does not carry the refusal `parsePhaseMap` promises.
+- [ ] Panel 2026-10-12 (estate, contradiction, deliverable): the acceptance grep for `BOARD_PHASES`, `toBoardPhase` and `storyPhase` under `packages/fleet/src` already returns zero, so it proves nothing about slice 1.
+- [ ] Panel 2026-10-12 (moderator, a blind spot of all four lenses): the default map applies to every adopting repository with no `Workflow phases` key, so an upgrade moves its Draft plans to Design and empties its Discovery column. The plan does not say whether that is a breaking change or what the release notes name. `skills/plot-board-setup/SKILL.md:514` still names `Endgame`, and no slice lists it.
 
 ## Slices
 
