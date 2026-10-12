@@ -154,7 +154,7 @@ The bundle and the endpoint write the state receipt through `recordStateReceipt(
 
 ### The idea asks about design
 
-- `feature/the-idea-asks-about-design` — a `/plot-idea` step after the ceremony questions asks the design question and writes `State: Design` with an empty `## Spec` on yes; its unattended rule writes Draft with no answer; the Progress line at `skills/plot-idea/SKILL.md:415`; its README and Model Guidance table follow; the two hand runs recorded in the PR <!-- builds: the plot-idea design question -->
+- `feature/the-idea-asks-about-design` — a `/plot-idea` step after the ceremony questions asks the design question and writes `State: Design` with an empty `## Spec` on yes; its unattended rule writes Draft with no answer; the Progress line at `skills/plot-idea/SKILL.md:415`; its README and Model Guidance table follow; the two hand runs recorded in the PR → #1628 <!-- builds: the plot-idea design question -->
 
 ### Needs design
 
