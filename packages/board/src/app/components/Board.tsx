@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
-import type { Board, Card, Phase, StoryCard } from '../../contract/schema.js';
-import { PHASE_LEADERSHIP } from '../../contract/schema.js';
+import { useMemo, useState, type CSSProperties } from 'react';
+import type { Board, Card, StoryCard } from '../../contract/schema.js';
 import { NO_STORY, passesFilter, passesSprintFilter, sprintMembershipLookup } from '../lib/filters.js';
 import { checksUnaskableOn } from '../lib/plan.js';
 import { PlanCard } from './PlanCard.js';
@@ -23,6 +22,17 @@ import { PlanSourceLine } from './PlanSourceLine.js';
  * week `Testing` overtook it.
  */
 export const COLUMN_LIMIT = 5;
+
+/**
+ * The `grid-template-columns` value of the board at the `xl` breakpoint: one
+ * equal track per declared column, so the grid has no empty track and wraps no
+ * column onto a second row.
+ *
+ * @param count - the number of columns the payload declares.
+ * @returns a `repeat(count, minmax(0, 1fr))` track list.
+ */
+export const boardGridColumns = (count: number): string =>
+  `repeat(${count}, minmax(0, 1fr))`;
 
 /**
  * How recent a card is, for ordering — its phase date as a comparable number,
@@ -170,7 +180,7 @@ export function BoardView({
   // the way for the session, this is opened to answer one question, and the
   // truncated view is the one worth returning to.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const toggle = (phase: Phase) =>
+  const toggle = (phase: string) =>
     setExpanded((prev) => ({ ...prev, [phase]: !prev[phase] }));
   // The board's own stories, by slug — so a card's badge is handed the story it
   // names rather than reconstructing a path from the slug.
@@ -189,7 +199,18 @@ export function BoardView({
 
   return (
     <>
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    {board.phaseMapRefusal && (
+      <p
+        role="alert"
+        className="mb-3 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+      >
+        {board.phaseMapRefusal} — drawing the default phases.
+      </p>
+    )}
+    <div
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-(--board-columns)"
+      style={{ '--board-columns': boardGridColumns(board.columns.length) } as CSSProperties}
+    >
       {board.columns.map((column) => {
         // Sprint and story filters intersect.
         const cards = column.cards.filter(
@@ -214,14 +235,14 @@ export function BoardView({
                   colour alone — the accent stripe only repeats it. */}
               <h2
                 className="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-                title={`${column.phase} — ${PHASE_LEADERSHIP[column.phase].who}`}
+                title={column.leadership ? `${column.phase} — ${column.leadership.who}` : column.phase}
               >
-                <span aria-hidden>{PHASE_LEADERSHIP[column.phase].icon}</span>
+                {column.leadership && <span aria-hidden>{column.leadership.icon}</span>}
                 <span className="truncate">{column.phase}</span>
               </h2>
               <span className="flex shrink-0 items-center gap-1">
                 {/* What is left before signoff — the question the column asks. */}
-                {column.phase === 'Testing' && board.checklist && (
+                {column.checklist && board.checklist && (
                   <span
                     className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
                     title="Release checklist"
@@ -253,6 +274,7 @@ export function BoardView({
                   <PlanCard
                     key={card.path}
                     card={card}
+                    accent={column.accent}
                     showSprint={showSprint}
                     showStory={showStory}
                     dispatch={board.dispatch}
