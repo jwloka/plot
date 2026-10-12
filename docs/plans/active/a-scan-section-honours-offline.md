@@ -1,1 +1,0 @@
-../2026-09-17-a-scan-section-honours-offline.md

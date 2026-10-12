@@ -1,1 +1,0 @@
-../2026-09-04-every-element-is-a-domain-concept.md

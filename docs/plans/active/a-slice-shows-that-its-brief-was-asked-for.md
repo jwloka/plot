@@ -1,1 +1,0 @@
-../2026-09-12-a-slice-shows-that-its-brief-was-asked-for.md

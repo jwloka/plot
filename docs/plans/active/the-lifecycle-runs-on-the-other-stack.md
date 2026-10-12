@@ -1,1 +1,0 @@
-../2026-09-07-the-lifecycle-runs-on-the-other-stack.md

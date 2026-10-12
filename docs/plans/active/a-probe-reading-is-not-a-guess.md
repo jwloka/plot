@@ -1,1 +1,0 @@
-../2026-09-17-a-probe-reading-is-not-a-guess.md

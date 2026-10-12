@@ -1,1 +1,0 @@
-../2026-09-22-a-failed-tick-must-not-end-the-daemon.md

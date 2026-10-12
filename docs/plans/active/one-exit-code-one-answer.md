@@ -1,1 +1,0 @@
-../2026-09-20-one-exit-code-one-answer.md

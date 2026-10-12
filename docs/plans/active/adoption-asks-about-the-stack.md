@@ -1,1 +1,0 @@
-../2026-09-07-adoption-asks-about-the-stack.md

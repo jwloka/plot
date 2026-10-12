@@ -1,1 +1,0 @@
-../2026-10-01-a-closed-pr-carries-no-branch.md

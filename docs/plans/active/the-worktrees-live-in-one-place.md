@@ -1,1 +1,0 @@
-../2026-08-23-the-worktrees-live-in-one-place.md

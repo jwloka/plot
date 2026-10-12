@@ -1,1 +1,0 @@
-../2026-09-09-an-adopting-repo-installs-its-gates.md

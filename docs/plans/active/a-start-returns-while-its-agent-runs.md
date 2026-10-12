@@ -1,1 +1,0 @@
-../2026-10-01-a-start-returns-while-its-agent-runs.md

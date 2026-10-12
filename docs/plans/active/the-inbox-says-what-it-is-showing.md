@@ -1,1 +1,0 @@
-../2026-09-17-the-inbox-says-what-it-is-showing.md

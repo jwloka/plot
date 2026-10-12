@@ -1,1 +1,0 @@
-../2026-09-20-a-pr-list-reads-every-page.md

@@ -1,1 +1,0 @@
-../2026-09-12-a-plan-is-questioned-before-it-is-approved.md

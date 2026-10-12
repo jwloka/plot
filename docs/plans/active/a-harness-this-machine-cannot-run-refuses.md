@@ -1,1 +1,0 @@
-../2026-09-13-a-harness-this-machine-cannot-run-refuses.md

@@ -1,1 +1,0 @@
-../2026-09-21-the-board-asks-only-what-changed.md

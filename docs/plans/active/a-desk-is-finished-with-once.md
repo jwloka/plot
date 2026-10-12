@@ -1,1 +1,0 @@
-../2026-09-05-a-desk-is-finished-with-once.md

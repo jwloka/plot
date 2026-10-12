@@ -1,1 +1,0 @@
-../2026-10-01-the-board-reads-its-own-repositorys-pr-store.md

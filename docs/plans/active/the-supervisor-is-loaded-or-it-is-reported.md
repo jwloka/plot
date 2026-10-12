@@ -1,1 +1,0 @@
-../2026-09-09-the-supervisor-is-loaded-or-it-is-reported.md

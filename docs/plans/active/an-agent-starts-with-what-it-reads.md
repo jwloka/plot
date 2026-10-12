@@ -1,1 +1,0 @@
-../2026-10-02-an-agent-starts-with-what-it-reads.md

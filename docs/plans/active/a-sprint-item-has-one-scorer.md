@@ -1,1 +1,0 @@
-../2026-09-07-a-sprint-item-has-one-scorer.md

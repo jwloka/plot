@@ -1,1 +1,0 @@
-../2026-10-01-an-approved-slice-has-a-name.md

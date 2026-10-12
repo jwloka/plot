@@ -1,1 +1,0 @@
-../2026-09-22-work-given-up-is-not-work-never-done.md

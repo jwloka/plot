@@ -1,1 +1,0 @@
-../2026-09-17-a-rule-reaches-the-install-that-runs-it.md

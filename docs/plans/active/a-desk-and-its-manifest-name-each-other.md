@@ -1,1 +1,0 @@
-../2026-10-01-a-desk-and-its-manifest-name-each-other.md

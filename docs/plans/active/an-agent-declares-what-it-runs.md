@@ -1,1 +1,0 @@
-../2026-09-12-an-agent-declares-what-it-runs.md

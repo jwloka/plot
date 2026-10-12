@@ -1,1 +1,0 @@
-../2026-09-04-a-lifecycle-is-enforced-by-a-test.md

@@ -1,1 +1,0 @@
-../2026-09-06-the-supervisor-says-why-it-handed-nothing.md

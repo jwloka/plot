@@ -1,1 +1,0 @@
-../2026-08-28-a-published-board-brings-its-scripts.md

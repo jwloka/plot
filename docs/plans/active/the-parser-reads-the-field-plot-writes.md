@@ -1,1 +1,0 @@
-../2026-09-17-the-parser-reads-the-field-plot-writes.md

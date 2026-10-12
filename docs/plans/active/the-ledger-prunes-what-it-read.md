@@ -1,1 +1,0 @@
-../2026-09-21-the-ledger-prunes-what-it-read.md

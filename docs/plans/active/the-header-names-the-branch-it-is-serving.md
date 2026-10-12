@@ -1,1 +1,0 @@
-../2026-08-26-the-header-names-the-branch-it-is-serving.md

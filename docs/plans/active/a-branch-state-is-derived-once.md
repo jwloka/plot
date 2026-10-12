@@ -1,1 +1,0 @@
-../2026-09-04-a-branch-state-is-derived-once.md

@@ -1,1 +1,0 @@
-../2026-10-01-a-plan-row-shows-plan-status-only.md

@@ -1,1 +1,0 @@
-../2026-09-09-every-issue-renders-as-open-issue.md

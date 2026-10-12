@@ -1,1 +1,0 @@
-../2026-08-28-a-board-names-the-repo-it-serves.md

@@ -1,1 +1,0 @@
-../2026-08-24-an-unreachable-host-is-not-an-answer.md

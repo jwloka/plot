@@ -1,1 +1,0 @@
-../2026-09-15-a-slice-names-the-agent-it-needs.md
