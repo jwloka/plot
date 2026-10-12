@@ -22,7 +22,7 @@ Board impact: yes, and it is the subject. `refreshPrs` gains a durable store; no
 
 ## Design
 
-**The full argument is [`docs/stories/the-index-holds-what-the-host-said/DESIGN-index.md`](../stories/the-index-holds-what-the-host-said/DESIGN-index.md)**, including the per-connector lifecycle and the three questions it leaves open. This plan implements the two slices that need no further decision.
+**The full argument is [`docs/stories/the-master-agent-holds-the-fleet/DESIGN-index.md`](../stories/the-master-agent-holds-the-fleet/DESIGN-index.md)**, including the per-connector lifecycle and the three questions it leaves open. This plan implements the two slices that need no further decision.
 
 ### What is already there, and what is missing
 

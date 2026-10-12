@@ -1,7 +1,7 @@
 ## Implementation brief — the-board-asks-only-what-changed (wave 1: The store holds what the host said)
 
 - **Plan (canonical):** [`docs/plans/2026-09-21-the-board-asks-only-what-changed.md`](../../docs/plans/2026-09-21-the-board-asks-only-what-changed.md) on `main`
-- **Design (the full argument):** [`docs/stories/the-index-holds-what-the-host-said/DESIGN-index.md`](../../docs/stories/the-index-holds-what-the-host-said/DESIGN-index.md)
+- **Design (the full argument):** [`docs/stories/the-master-agent-holds-the-fleet/DESIGN-index.md`](../../docs/stories/the-master-agent-holds-the-fleet/DESIGN-index.md)
 - **Approved:** 2026-09-21, jwloka, in-session
 - **Branch:** `feature/the-store-holds-what-the-host-said` (base: `main`)
 - **Ends as:** one PR to `main`

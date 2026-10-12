@@ -20,7 +20,7 @@ This wave narrows that call. Two edits and one consequence:
 2. **`refreshPrs` sends the store's watermark** as `--since`, and merges the answer rather than replacing with it.
 3. **A periodic full read stays**, because a delta cannot see a deletion — and **`PR_REQUESTS_PER_REFRESH` follows the new cost.**
 
-The plan is canonical; this is orientation. The full argument, including the per-connector table and the three questions it leaves open, is [`docs/stories/the-index-holds-what-the-host-said/DESIGN-index.md`](../../docs/stories/the-index-holds-what-the-host-said/DESIGN-index.md).
+The plan is canonical; this is orientation. The full argument, including the per-connector table and the three questions it leaves open, is [`docs/stories/the-master-agent-holds-the-fleet/DESIGN-index.md`](../../docs/stories/the-master-agent-holds-the-fleet/DESIGN-index.md).
 
 ### The decisions the plan settles — do not re-derive them
 

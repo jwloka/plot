@@ -116,6 +116,10 @@ and a shell subprocess to parse it back.
   implemented: the only entity Plot pays per request for, and the one whose
   `state` means different things on different API surfaces — REST says `closed`
   for a PR GraphQL calls `MERGED`.
+- **[Index](DESIGN-index.md)** — what the host said, kept: one bought answer
+  per PR, refreshed by a delta call and read by the decisions that would
+  otherwise ask the host. Measured 2026-09-21, one `gh pr list --state all`
+  was 96 % of a 32-second scan.
 - **[Branch](DESIGN-branch.md)** — a slice's unit of work and the claim on it:
   the push *is* the lock, git outranks the plan's annotation, and its state is
   only as fresh as the last fetch — measured, 43 merged branches reading as 0.
