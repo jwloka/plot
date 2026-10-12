@@ -15,6 +15,7 @@
 - **Approved:** 2026-08-16, jwloka, plan-PR #120 merged
 - **Started:** 2026-08-16, jwloka, `bug/board-claimed-from-git`
 - **Started:** 2026-08-16, jwloka, `bug/dispatch-records-started`
+- **Released:** 2026-08-18, v2.5.0
 
 ## Approval
 
