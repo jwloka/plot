@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 1
+- **Rounds:** 2
 
 ## Changelog
 
@@ -95,6 +95,18 @@ One test per place proves it with a spike branch and a non-spike branch of one D
 - [x] Panel round 1, estate, deliverable and cost: `proven` readers, the card states and the second receipt. Resolved: both schema copies, both sprint counters (WIP), the three card states and the badge are in the slices; the deliver workflow records one receipt per plan file; automatic delivery of a dependent carries its proven tracer plans (D5).
 - [x] Panel round 1, moderator blind spot, reconcile half: the reconcile scan does not read a merged spike of a Design plan as drift (`plot-reconcile-scan.sh:1035`, `:1135`), and `feature/the-spike-can-be-dispatched` adds a test that keeps it so. The release half is decided by D16 and the drop half by D17.
 - [x] Panel round 1, estate: `proven` collides with the merge-subject meaning. Resolved: D5 names the status `proven`, so the word stays, and *`proven` names a plan, not a branch* defines the difference.
+- [ ] Panel round 2, deliverable and cost (HIGH): the shell line ratchet refuses `feature/a-slice-is-marked-spike` and `feature/a-tracer-plan-stays-in-design`. `scripts/check-shell-lines.sh:14-19` stores no allowance, both slices add shell and name no removal, and the only named removal, the 22-line dispatch `case`, is in `feature/the-spike-can-be-dispatched`. Name a removal in each slice, or move the `case` replacement into the first slice.
+- [ ] Panel round 2, contradiction (HIGH): the person arm keys on the `Spike approved:` record, and the state gate passes a commit that removes a line (`rules/state-transition.ts:121-122`). Two plan-only hand edits, or a person merging the spec commit on the plan PR head, leave a Design plan on the `pr` arm, which approves with no `--who` (`workflows/approve.ts:252`, `:270-274`). Key the person arm on `phase === 'design'` (D10), or gate the removal of the record.
+- [ ] Panel round 2, contradiction: `POST /api/approve` answers 409 only for `Review: in-session` (`packages/board/src/server/approve.ts:306`), so its agent arm starts an approval of a `Review: pr` Design plan. The check must read the same person-arm answer as the bundle.
+- [ ] Panel round 2, estate and contradiction: `approve-spike` has no route with no board. `plot-state-receipt.sh --unowned-action` and `_action_of` (`:173-180`, `:240`, `:253-259`) know four actions, no skill names the spike approval, and slice 2 does not amend `CLAUDE.md:499`, `:518` or `AGENTS.md`. Name the route or state that the spike approval needs the board.
+- [ ] Panel round 2, deliverable and estate: no slice names how the spike annotation and the `Spike approved:` record reach the scan's `P` and `W` rows (`plot-fleet-scan.sh:3110`, `:3140-3144`), and slices 3 and 5 both change the two-token `P` parse (`:3151-3158`). Pass the spike flag and the record as two readings, so that `sliceVerdict` makes the decision and not the scan.
+- [ ] Panel round 2, all lenses: the resolved Open Point on the readings says `PlanMetaSchema` gains four fields and the pulse `PlanSchema` gains `type`. The Approach and the slices say five fields and `tracer` (D15). Correct that line.
+- [ ] Panel round 2, all lenses: *Gating the spike approval* names the shell `record_state_receipt` (`plot-state-receipt.sh:82`); a bundle writes through `recordStateReceipt` (`server/entry/ladder.ts:64`), keyed on a `State:` value. Name the writer and a receipt key that the gate can tell apart from `State:`.
+- [ ] Panel round 2, estate: `Slices confirmed:` duplicates the `Approved:` record that the same commit writes (`transitions/plan.ts:338-343`), and no reader needs it. Drop the record or name its reader.
+- [ ] Panel round 2, cost: the tracer slice spans about 12 to 15 files, and the deliver workflow and bundle are single-plan (`workflows/deliver.ts:139`, `entry/deliver.ts:368`). State whether the bundle runs `deliver` once per plan, dependent last, or split the delivery into its own slice. The spike-approval slice also mixes two repository-wide gates with a controller; the gate half can land first.
+- [ ] Panel round 2, contradiction (LOW): a second `plot-approve*` bundle leaves the glob `plot-approve*.mjs` ungated (`rules/ci-suite.ts:284-292`); the Changelog's "whatever the plan's review channel" reads as every plan; the person arm replaces a `Review: ballot` tally without saying so; `draftPlacement` reads `draft` only (`rules/draft-placement.ts:45`).
+- [ ] Panel round 2, deliverable, estate and cost (LOW): `PlanReadings` (`rules/phase.ts:113-124`) has no `tracer` reading; `skills/plot/SKILL.md:284` describes `/plot-approve` behaviour that no code has; Notes line 125 gives a stale reason for the tracer slice's position; the skill edits need `bumps:` entries; `spike-unmerged` leaves the adapter choice open.
+- [ ] Panel round 2, moderator blind spot: every dispatch test is per place. No acceptance criterion proves that an approved spike dispatches end to end, from the annotation through plan-meta, the scan, `sliceVerdict`, `plangate` and the brief to a worker commit.
 
 ## Slices
 

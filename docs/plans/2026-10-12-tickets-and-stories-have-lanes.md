@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 1
+- **Rounds:** 2
 
 ## Changelog
 
@@ -121,6 +121,23 @@ Archived means the location: a story moved under `docs/stories/archived/`, as th
   - Three plans widen `Issue` and `Tracker`: whichever of this plan's index slice and `feature/an-issue-names-its-assignee` lands second adds its field to `IssueIndexSchema` and raises `ISSUE_INDEX_VERSION`; `issueOpen` (`the-fleet-verifies-what-it-delivered`) is a write and does not touch the index.
   - The issue index reuses the PR index's file adapter pattern and `connectorFile`, and not `foldPrIndex`, because a whole replacement needs no fold by watermark.
   - The shell-line ratchet: the first slice's new `plot-host.sh` arms pass `scripts/check-shell-lines.sh` by removing an equal count of shipped shell lines, named in its PR.
+- [ ] [UX] D20 with D22 widens *Waiting on you*. After the project-wide Jira slice, a reader with no `jira:` spelling in `People` sees every project ticket, and no `People` entry has one today. Changelog `:20`, Acceptance `:130` and the D20 point above say the inbox stays narrow; state the condition and the upgrade step. — *panel round 2, estate, contradiction, deliverable (must change)*
+- [ ] [Security] The Jira open read over the whole instance. With no `Ticket prefixes` the scope is empty (`plot-host.sh:4674-4684`), so dropping `assignee = currentUser()` reads every project. Require prefixes for the open read as for the closed read, and fix the "instance-wide" text in `plot-board-setup/SKILL.md:229`, `plot-init/SKILL.md:205` and `plot-config.sh:180`. — *panel round 2, estate, contradiction (must change); cost*
+- [ ] [Technical] `trackerGitHost` against the port doc. `ports/tracker.ts:68` says a tracker is not a git host, `:103` and `:114` say no declared tracker answers `unaskable`, and `CLAUDE.md` says it gets `trackerNone`. Name both doc edits, the connector's `limit()` and its budget tag, and build it from `trackerReads` (`tracker-shell.ts:120-170`). — *panel round 2, contradiction (must change); estate*
+- [ ] [Performance] The GitHub request count per pass. On this repository one pass is 2 open pages and 2 closed pages (154 closed in 14 days), and each page writes a budget record that the cadence reads, against a declared `github: 2`. Decide whether the issue fold gets its own gate and cost, or price the pass and state the PR-refresh delay; also say whether a rate-limited issue read sets the PR backoff, and price the D20 Jira read. — *panel round 2, cost (must change); estate, contradiction, deliverable*
+- [ ] [Technical] Acceptance `:134` against the toggle. `GET /api/issues/closed` makes an `issue-list` call under a fleet; restate the line, and state a cache or backoff for the 1000-row read. — *panel round 2, cost (must change); contradiction*
+- [ ] [Technical] The Archived lane path. The board reads the `Story directory` key (`board.ts:1846`); use `<Story directory>/archived/` in place of `docs/stories/archived/`. — *panel round 2, estate (must change)*
+- [ ] [Domain] The derived `archived` standing. `StoryStanding` is `StoryStatus | 'archived'` (`transitions/story.ts:36`) and the map declares only `story:<status>`, so the story table (Done) and `storyLane` (`hidden` for an undeclared status) disagree. Say which, and align with Open Point 3 of `the-phases-are-declared`. — *panel round 2, estate, contradiction, deliverable*
+- [ ] [Technical] Who reaches the tracker. `PrWorld` (`pr-refresh.ts:106-119`) has no tracker input, and the issue-index slice does not say that the fold and the no-fleet read call `trackerForIssues` in place of `hostSaid` (`fleet.ts:1490`). — *panel round 2, estate, deliverable*
+- [ ] [Technical] `Issue.assignee` on the git-host route. `the-board-has-three-tabs:71` reads the assignee only in the GitHub and Jira tracker connectors, and `plot-host.sh issue-list` emits none, so on a repository with no `Tracker` key *Waiting on you* is empty for a matched reader. — *panel round 2, deliverable (cross-plan)*
+- [ ] [Technical] A failed pass. `:62` keeps the previous rows and `:65` shows the absence text; say which the lanes show and whether `at` moves. Name the index file for a `nobody` source and for `Tracker: github-issues` against the git-host GitHub source. — *panel round 2, contradiction*
+- [ ] [Technical] Smaller points. — *panel round 2, estate, contradiction, deliverable, cost*
+  - The `CLAUDE.md` edit says that only a view reads the index's open rows, so it does not contradict "Only a terminal answer is read from the index".
+  - Acceptance `:138` needs *Show released*, which `feature/the-planning-tab-shows-design-to-testing` builds; the lanes slice does not wait on it.
+  - The story (`:41`) and `DESIGN-phases.md:235` still call the Discovery toggle the "released toggle".
+  - The inbox now reads up to 1000 open rows on the 4 s `/api/fleet` poll, with no stated payload bound.
+  - The shell-line ratchet names no lines to remove.
+  - `derivedStanding` is at `transitions/story.ts:397`, not `:395`.
 
 ## Acceptance
 

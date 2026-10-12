@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 1
+- **Rounds:** 2
 
 ## Changelog
 
@@ -120,6 +120,16 @@ The line carries which jurors committed `Evidence: executed`.
 - [x] [Panel] The issue slice ran in the same wave as the run it consumes. — *panel round 1* — resolved: the port write and the wiring are two slices, and the wiring is in a later wave than the run.
 - [x] [Panel] `next-checklist.md` never reaches the board's badge, and one item per claim is not `rc`'s shape. — *panel round 1* — resolved: the file is `vnext-checklist.md`, with one item per plan as `rc` writes.
 - [x] [Panel] Each record and each checklist rewrite is a push to `main`. — *panel round 1* — resolved: the checklist joins the record's commit, so about 5.4 pushes a day; stated in *Cost and capacity*.
+- [ ] [Estate] `plot-local-checks.mjs` names no plan-specific check at the pinned commit: `changedFiles` diffs `origin/<main>...<branch>` (`refs-git.ts:308-317`), and the delivery commit is an ancestor of main, so the diff is empty. Name the source of the juror's commands at that commit, for example the plan's merge commits' files. — *panel round 2, estate*
+- [ ] [Estate] A re-verification appends a second `Verified:` line: `withRecord` fills a placeholder or appends and never replaces a filled line (`workflows/rendering.ts:66-96`), and `PlanRecordWrite.field` allows no `Verified` (`workflows/decision.ts:76`). Name the slice that adds the field and the replace rule. — *panel round 2, estate*
+- [ ] [Estate] After `/plot-release rc` renames `vnext-checklist.md`, the next run writes a new one that sorts last (`board.ts:420-424`), so the Testing badge leaves the RC checklist while its sign-off is open. — *panel round 2, estate*
+- [ ] [Contradiction] `/plot-reject` keeps the `Verified:` record (`skills/plot-reject/SKILL.md:111-112`), and the fleet never re-runs a recorded plan, so a rejected and re-delivered plan keeps a stale record and badge. — *panel round 2, contradiction*
+- [ ] [Contradiction] `--verify` reuses step 5 text that does not fit: step 2 answers "Already delivered." for a Delivered plan (`skills/plot-deliver/SKILL.md:96-98`), and step 5.3 reads `panel.md`, not `verify-panel.md` (`:351-353`). — *panel round 2, contradiction*
+- [ ] [Contradiction] The run selects every `State: Delivered` plan, including a tracer plan, which D5 and `DESIGN-phases.md:114` keep out of Testing; the `verify-<slug>` worktree is not said to hold `.plot-worker.pid`, which the CI-suite refusal needs (`gate.ts:415-420`); `no issue: no Tracker declared` is wrong when `issueSource` answers `nobody` for a declared `Tracker` (`issue-source.ts:51-63`). — *panel round 2, contradiction*
+- [ ] [Deliverable] Nothing sends back a juror that omits a `Claim-<n>` line: `/plot-panel` gates and re-runs one Commitment (`skills/plot-panel/SKILL.md:64`, `:127-130`), so one missing line gives no record and a failed run the fleet never restarts. Name the owner of the per-claim send-back. — *panel round 2, deliverable*
+- [ ] [Deliverable] Step 5.1 numbers deliverables from Design and Slices, while `claimsOf` numbers Changelog entries; name how the skill receives `claimsOf`'s list. The template line `Claim-1: supported | refuted`, pasted by a juror, passes the gate as `supported` (tested, exit 0); show `<supported|refuted>`. — *panel round 2, deliverable*
+- [ ] [Cost] A verify process counts as 0 against `Parallel agents`, not 1: `fitFleet` counts registered agents, idle ones included (`workflows/assign.ts:224`), so with a full fleet the free-slot rule never starts a run. Slice 3 must say which behaviour it builds. — *panel round 2, cost*
+- [ ] [Cost] The plan prices no `pnpm install` in the fresh pinned worktree, states no run duration against about 5.4 deliveries a day, and states no expected rate of refused runs, each of which costs a person a manual `--verify`. — *panel round 2, cost*
 
 ## Slices
 

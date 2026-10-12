@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 1
+- **Rounds:** 2
 
 ## Changelog
 
@@ -86,6 +86,22 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 - [x] ~~Panel 2026-10-12 (estate): `parseLocalChecks` skips a bad entry silently.~~ Resolved: the Design says `parsePhaseMap` shares only the split and refuses a malformed entry.
 - [x] ~~Panel 2026-10-12 (estate, contradiction, deliverable): the acceptance grep under `packages/fleet/src` already returns zero.~~ Resolved: the grep is stated as today's fact, and the board slice's acceptance is a payload test over a non-default map.
 - [x] ~~Panel 2026-10-12 (moderator): the default map moves every adopting repository's Draft plans with no word on breaking change or release notes; `plot-board-setup/SKILL.md:514` still names Endgame.~~ Resolved: *Adopting repositories* states a minor bump and the Changelog carries the upgrade note with the declaration that restores the earlier columns; the prose slice lists `:514`.
+- [ ] `needsDesign` names no write target. D13 merges a `Review: pr` plan's PR with `State: Design`, so the write must reach the plan-PR branch; name the ref for each review channel and the checkout whose `.plot/state/` holds the receipt (`ladder.ts:59-66`). — *panel round 2, contradiction*
+- [ ] The upgrade note's restoring declaration declares no `story:` member, so after `tickets-and-stories-have-lanes` lands a repository that uses it draws no story lane (`tickets-and-stories-have-lanes.md:86`). Add `story:*` to a phase, or warn. — *panel round 2, contradiction*
+- [ ] The board slice decides the checklist column (`Board.tsx:224`), the leadership-badge rule (`Board.tsx:217-219`, `Swimlanes.tsx:161-163`) and the card controls in `.tsx`, and the acceptance test asserts a render. Make each a payload property computed in the domain and assert it without a browser (*Every rendered state is a domain property*, DESIGN-phases.md §8). — *panel round 2, contradiction*
+- [ ] The prose slice adds `Design` as a state to text that calls the states "phases" (`CLAUDE.md:205-207`, `MANIFESTO.md:101`, `:148`, `skills/plot/SKILL.md:170`). Rename that sense to "state", or say why both sets may share the word and the name `Design`. — *panel round 2, contradiction*
+- [ ] `DESIGN-phases.md:140` puts the design question in "`/plot-idea`'s ceremony step"; change it to a step after the ceremony questions, as Design › *The design question* says. — *panel round 2, contradiction*
+- [ ] Name that D1 and D2 reverse the decision "Draft is the discovery phase" of the released plan `2026-08-16-board-shows-discovery`, and argue the minor bump against *Versioning*'s "breaking workflow changes". — *panel round 2, contradiction*
+- [ ] The *Needs design* slice says how `CLAUDE.md:499` words the new endpoint beside "A tenth, `merge`, has no endpoint", and how the count reads after `approve-spike` is added and `/api/commission` is removed by the siblings. — *panel round 2, estate, contradiction*
+- [ ] Cross-plan: `the-fleet-verifies-what-it-delivered.md:150` (wait at `:128`) waits on `feature/the-phases-are-a-declaration` because that slice "moves the `toBoardPhase` callers in board.ts"; after this revision `feature/the-board-draws-the-declared-phases` moves them. Move the wait or restate the reason in the sibling. — *panel round 2, estate, contradiction, deliverable*
+- [ ] The board slice names the column builder `board.ts:2252` (`BOARD_PHASES.map`), `PHASE_ACCENT` (`PlanCard.tsx:13`, read at `:368`) and `toggle` (`Board.tsx:173`), and says that a declared phase outside the five gets no accent. — *panel round 2, estate, deliverable, cost*
+- [ ] Name the existing `Card.status` (`schema.ts:599`) and say why `CardSchema.state` is added beside it, or read `status` for `isApproved` and `isReadyToStart`. — *panel round 2, estate*
+- [ ] Citations: `PlanReadings.phase` is at `rules/phase.ts:115`, not `:118`; `config(key, fallback)` is at `ports/plan-store.ts:133`, not `:131`. — *panel round 2, estate*
+- [ ] `mock-fleet.ts:306` and `:325` hold two `idea/` rows in Discovery; they read the phase that holds `plan:draft`. The prose slice lists `MANIFESTO.md:156` ("Endgame fixes"); the idea slice lists the Progress line at `skills/plot-idea/SKILL.md:415`. — *panel round 2, estate*
+- [ ] State the card order inside a column that holds both `draft` and `design` plans (`phaseDateOf`, `board.ts:1165-1177`). — *panel round 2, deliverable*
+- [ ] The *Needs design* slice names the `build.mjs` output, the `.gitattributes` `-merge` line and the `skills/plot/scripts/README.md` row for `board/plot-needs-design.mjs`, and the `'Design'` member of the record-field unions at `transitions/plan.ts:138` and `workflows/decision.ts:76`. — *panel round 2, deliverable, cost*
+- [ ] The board slice's test list adds `approve.browser.test.ts:136`, `tiny-garden.data.test.ts:34` and `port.test.mjs:90`, which assert the old mapping without the literal; the count is about 31 files, 14 of them browser tests. Slices 3 to 5 name their tests. Optional: land `CardSchema.state` and the predicates before the default-map switch. — *panel round 2, cost*
+- [ ] Say where `server/fleet.ts` gets the parsed map; if it reads the key itself, join an existing config read and add no serial `plot-config.sh` spawn. — *panel round 2, cost*
 
 ## Slices
 
