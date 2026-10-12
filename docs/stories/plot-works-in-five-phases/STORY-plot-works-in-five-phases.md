@@ -1,0 +1,108 @@
+---
+title: Plot works in five phases
+author: jwloka
+status: active
+created: 2026-10-12
+updated: 2026-10-12
+---
+
+# Plot works in five phases
+
+## Objective
+
+The board shows the five phases of the agentic workflow, Discovery, Design, Development, Testing and Released, and the phases come from a `## Plot Config` declaration instead of the domain. Discovery holds stories and tickets, plans move through Design, Development, Testing and Released, and the board's three tabs, Discovery, Planning and Delivery, follow that split. The fleet writes the design spec of a plan in Design, dispatches an approved spike, and verifies every delivered plan against the merged work. Approval and release stay a person's act.
+
+The design spec is [DESIGN-phases.md](DESIGN-phases.md).
+
+## Why Now
+
+`packages/domain/src/entities/workflow.ts:35` hard-codes five phases, and `rules/phase.ts` maps every plan state and story status onto them. The phases are the operator's workflow, not a fact Plot owns, so a repository with a different workflow cannot declare its own. The mapping also puts a Draft plan in Discovery beside the stories, and spreads stories over all five columns, so the Plans tab mixes two subjects. No command writes `State: Design` today, so the Design phase holds no plan that a controller put there.
+
+## Decisions Taken in Scoping
+
+The twelve decisions in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session.
+
+## Current Plan
+
+### Phase 1: The phases are declared ⏸️
+
+- ⏸️ [`the-phases-are-declared`](../../plans/2026-10-12-the-phases-are-declared.md) — the `Workflow phases` key, the shipped default, a domain rule over the declared map in place of `toBoardPhase` and `storyPhase`, the board's columns and auto-bump against the map, `/plot-idea`'s design question, the *Needs design* action, and the phase prose. Unblocks every other plan.
+
+### Phase 2: Design work proves the path ⏸️
+
+- ⏸️ [`design-work-proves-the-path`](../../plans/2026-10-12-design-work-proves-the-path.md) — the spike marker, approving the spike alone, confirming the slices after the spike, and tracer-bullet plans. Waits on Phase 1.
+
+### Phase 3: The board has three tabs ⏸️
+
+- ⏸️ [`the-board-has-three-tabs`](../../plans/2026-10-12-the-board-has-three-tabs.md) — Discovery, Planning and Delivery, the redirects from the old tab names, the Planning tab's *Show released*, and the Delivery tab's ticket, sprint and owner filters. Waits on Phase 1. Runs in parallel with Phase 2.
+
+### Phase 4: Tickets and stories have lanes ⏸️
+
+- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — closed issues through the index, the ticket and story lane rules, and the Discovery tab with its tag cloud and released toggle. Waits on Phase 3.
+
+### Phase 5: The fleet writes the design ⏸️
+
+- ⏸️ [`the-fleet-writes-the-design`](../../plans/2026-10-12-the-fleet-writes-the-design.md) — the fleet commissions a spec for a Design plan with an empty spec, and dispatches an approved spike. Waits on Phases 1 and 2.
+
+### Phase 6: The fleet verifies what it delivered ⏸️
+
+- ⏸️ [`the-fleet-verifies-what-it-delivered`](../../plans/2026-10-12-the-fleet-verifies-what-it-delivered.md) — a verification panel per Delivered plan, a verification record, an issue per refuted claim, and a manual release checklist. Waits on Phase 1.
+
+## Open Points
+
+- ⏸️ **1. The key and its grammar.** DESIGN-phases.md §2 proposes the key name `Workflow phases` and the value `Discovery = story:*; Design = plan:draft, plan:design; …`. D12 names the key only as an example. Confirm at the review of `the-phases-are-declared`.
+- ⏸️ **2. Leadership for a declared phase.** `PHASE_LEADERSHIP` is keyed by the five default names. The spec proposes no leadership badge for a phase name outside them. An alternative is a leadership part in the key's grammar.
+- ⏸️ **3. A story in a plan phase.** A custom map can put a story status into a phase that also holds plan states. The spec's default: the Discovery tab lists every story whatever phase holds it, and the Planning tab lists plans only. No decision covers a custom map of this shape.
+- ⏸️ **4. Where a `Review: pr` plan lives while its spike runs.** The fleet reads plans on the default branch. A plan in Design whose plan PR is still open is not there. The plan default in `design-work-proves-the-path`: approving the spike merges the plan PR with `State: Design` and the `Spike approved:` record, and the later approval of the plan records through the in-session channel on the default branch.
+- ⏸️ **5. Delivering and releasing a tracer plan.** D5 says a tracer plan is released with the first dependent that ships. The plan default: automatic delivery skips a tracer plan, and `/plot-deliver` delivers a proven tracer plan in the same step as its first dependent.
+- ⏸️ **6. `Type: tracer` replaces the plan's type.** `plot-plan-meta.sh:448` reads one type word from `feature`, `bug`, `docs` and `infra`. A tracer plan loses that word. D5 allows "`Type: tracer` or equivalent marker"; the plan default is `Type: tracer`.
+- ⏸️ **7. The current user in a tracker.** D9 filters *Waiting on you* to tickets assigned to the current user. The reader is a git host login and a git email (`mine-filter.ts:119`). A Jira assignee is a Jira account. How the two are matched is not decided; the `People` key is a candidate.
+- ⏸️ **8. How many closed tickets the index holds.** The released toggle shows every closed ticket (D7). The plan default: one full read, then a delta by watermark. No bound is decided.
+- ⏸️ **9. Where the fleet's spec commit goes.** The plan default in `the-fleet-writes-the-design`: onto the plan PR's head branch when one is open, otherwise onto a new `idea/<slug>-spec` branch with a PR that a person merges.
+- ⏸️ **10. The command a spec agent runs.** *Commission design* reuses the `Idea command` key today (`packages/fleet/src/shared/implement-run.ts:29`). The plan default keeps it; a `Design command` key is the alternative.
+- ⏸️ **11. The checklist's file name before a version exists.** D11 builds on `docs/releases/v<version>-checklist.md`, which `/plot-release rc` names after it chooses the version. The plan default in `the-fleet-verifies-what-it-delivered`: the fleet writes `docs/releases/next-checklist.md`, and `/plot-release rc` renames it.
+- ⏸️ **12. More than one Active sprint.** `SprintStateSchema` admits several `Active` sprints. The plan default for the *Active sprint* toggle: the union of every Active sprint.
+- ⏸️ **13. A manual trigger for a spec run.** D10 has the fleet run today's *Commission design*. The plan default in `the-fleet-writes-the-design` removes the board button, because *Needs design* and the fleet cover its two halves. A *Write the spec now* button is the alternative.
+- ⏸️ **14. Which plans the first verification run covers.** D11 covers each Delivered plan. The plan default in `the-fleet-verifies-what-it-delivered`: Delivered plans from the day the run lands; Released plans are not run.
+
+## Decisions
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-10-12 | D1. Five phases: Discovery, Design, Development, Testing, Released. Discovery holds only stories, and every story status maps to Discovery. Plans move through Design, Development, Testing and Released. | jwloka. A story and a plan are different subjects, and one column set that mixes them answers neither. |
+| 2026-10-12 | D2. Plan files keep their state words, and only the mapping changes: Draft and Design to Design, Approved to Development, Delivered to Testing, Released to Released. Rejected and Superseded stay off the board. | jwloka. No plan file changes. |
+| 2026-10-12 | D3. The Design phase is optional. Only a plan with significant design decisions gets design work: a design spec, and a spike slice before the remaining slices are confirmed. `/plot-idea` asks "does this plan carry significant design decisions?" and writes `State: Design` on yes. A person can move a Draft plan to Design later with a new *Needs design* controller action. The fleet never decides it. A Draft plan with no design work sits in the Design column, awaiting approval. | jwloka. |
+| 2026-10-12 | D4. A plan in Design names one slice as `spike`. A person approves the spike alone, the fleet dispatches it like any slice, and its PR is real code that lands. After the merge the plan stays in Design until a person confirms or rewrites the remaining slices and approves the plan into Development. | jwloka. |
+| 2026-10-12 | D5. A tracer-bullet plan (`Type: tracer` or an equivalent marker) is a full plan that lives only in Design and is prerequisite work for other plans, which wait on it through the existing `waits:` mechanism. It is approved and dispatched like any plan but stays in the Design column. When all its slices merge it reads `proven` and its dependents unblock. It is released with the first dependent that ships, so it never shows in Development or Testing. | jwloka. |
+| 2026-10-12 | D6. The board tabs Stories, Plans and Agents become Discovery, Planning and Delivery. The tab names are fixed in the board. | jwloka. |
+| 2026-10-12 | D7. The Discovery tab shows the tag cloud, a tickets lane group and a stories lane group. Ticket lanes Open, In progress and Done follow the tracker's category first; with no category, open and unnamed is Open, open and named by a plan's `Issue:` is In progress, closed is Done. Done shows tickets closed in the last 14 days. Story lanes: Draft (draft, ready, paused), Active (active, in-review), Done (done, not archived). One tab-wide toggle shows every archived story in an Archived lane and every closed ticket. The tracker port lists closed issues, read through the index. | jwloka. |
+| 2026-10-12 | D8. The Planning tab keeps the story and sprint filters, the story-lanes toggle and *Only my work*, and shows plans in Design, Development and Testing. A *Show released* checkbox, off by default, adds Released plans. | jwloka. |
+| 2026-10-12 | D9. The Delivery tab is today's Agents tab. *Waiting on you* keeps its content, and by default its ticket rows show only tickets assigned to the current user. An *Active sprint* toggle shows only the active sprint's plans and their PRs, branches, builds and agents. *Only my work* filters tickets, branches, PRs, plans and builds of the current user. | jwloka. |
+| 2026-10-12 | D10. For a plan in `State: Design` with an empty spec, the fleet commissions an agent to write it. After a person approves a spike, the fleet dispatches it. Approval stays a person's act. | jwloka. |
+| 2026-10-12 | D11. For each Delivered plan the fleet runs a verification panel against the merged work on the default branch: each Changelog and acceptance claim judged supported or refuted, a verification record in the plan, one `ai-generated` issue per refuted claim, and a flag on a refuted plan. The fleet also produces a manual release checklist for the endgame round, building on `/plot-release rc`'s `docs/releases/v<version>-checklist.md`. Release stays a person's act. | jwloka. |
+| 2026-10-12 | D12. The phases are configuration, not domain. A `## Plot Config` key maps each phase name to the plan states and story statuses it holds. Plot ships the five phases of D1 and D2 as the default, and this repository declares them explicitly. The hard-coded mappings move behind the declaration as a domain rule that takes the parsed map as a value. The board builds its columns and tab groupings from the map. The fleet reads states and markers only, never phase names. | jwloka. The phases come from the operator's agentic workflow, not from Plot (CLAUDE.md, *Project-Agnostic Design*). |
+
+## Excluded from Scope
+
+| Item | Reason | Revisit If |
+|------|--------|------------|
+| Renaming plan states | D2: plan files keep their state words | a declared map cannot express a workflow |
+| Configurable tab names | D6: the tab names are fixed | a second adopter needs other names |
+| A fleet that moves a plan into Design or approves it | D3, D10 | — |
+| A fleet that releases | D11 | — |
+
+## Session Log
+
+### 2026-10-12 — Brainstorming session
+
+jwloka designed the change in one brainstorming session and took decisions D1 to D12 and the decomposition into six plans. An unattended `/plot-idea` batch run then wrote this story, the design spec and six Draft plans on the branch `idea/batch-plot-works-in-five-phases`.
+
+**Key outcomes:**
+
+- The phases move from the domain into a `## Plot Config` declaration, with the agentic workflow's five phases as the default.
+- Discovery holds stories and tickets only; plans start in Design.
+- Design work (a spec and a spike) is optional and a person's decision; tracer-bullet plans prove a path and stay in Design.
+- The fleet writes specs and dispatches approved spikes in Design, and verifies delivered plans in Testing.
+- Six plans, in the order of the Current Plan above.
+
+---

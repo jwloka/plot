@@ -234,6 +234,7 @@ Long-running work spanning several plans. Stories carry the intent and the decis
 | [the-supervisor-delivers-the-approved-scope](docs/stories/archived/the-supervisor-delivers-the-approved-scope/STORY-the-supervisor-delivers-the-approved-scope.md) | done, archived 2026-10-12 | With auto-dispatch on, the fleet supervisor fixes or escalates every stop in an approved plan |
 | [the-shell-holds-no-behavior](docs/stories/the-shell-holds-no-behavior/STORY-the-shell-holds-no-behavior.md) | active | Every `.sh` under `skills/plot/scripts/` is a launcher, and the fleet runs apart from the board |
 | [an-agent-is-declared-and-corrected](docs/stories/archived/an-agent-is-declared-and-corrected/STORY-an-agent-is-declared-and-corrected.md) | done, archived 2026-09-14 | An agent is declared as a kind of worker, and a failed gate becomes a correction rather than a halt |
+| [plot-works-in-five-phases](docs/stories/plot-works-in-five-phases/STORY-plot-works-in-five-phases.md) | active | The board's phases are a declared workflow: Discovery holds stories and tickets, plans pass through Design, Development, Testing and Released, and the fleet writes specs and verifies deliveries |
 
 ---
 

@@ -1,0 +1,1 @@
+../2026-10-12-the-fleet-verifies-what-it-delivered.md
