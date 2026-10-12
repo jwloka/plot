@@ -13,7 +13,6 @@
 - **Released:** 2026-08-28, v2.11.0
 - **Started:** <!-- YYYY-MM-DD, who, `branch` -->
 - **Delivered:** 2026-08-28
-- **Released:** <!-- YYYY-MM-DD, version -->
 - **Started:** 2026-08-27, Jan Wloka, `bug/an-eligible-wave-can-be-started`
 
 ## Changelog

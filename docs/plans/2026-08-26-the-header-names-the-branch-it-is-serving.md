@@ -16,7 +16,6 @@
 - **Approved:** 2026-08-26, Jan Wloka, in-session
 - **Started:** <!-- YYYY-MM-DD, who, `branch` -->
 - **Delivered:** 2026-08-28
-- **Released:** <!-- YYYY-MM-DD, version -->
 - **Started:** 2026-08-26, Jan Wloka, `bug/the-header-names-its-branch`
 
 ## Changelog

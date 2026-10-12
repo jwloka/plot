@@ -13,7 +13,6 @@
 - **Approved:** 2026-08-27, Jan Wloka, in-session
 - **Started:** <!-- YYYY-MM-DD, who, `branch` -->
 - **Delivered:** 2026-08-28
-- **Released:** <!-- YYYY-MM-DD, version -->
 
 ## Changelog
 
