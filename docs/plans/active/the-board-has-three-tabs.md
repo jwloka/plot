@@ -1,0 +1,1 @@
+../2026-10-12-the-board-has-three-tabs.md
