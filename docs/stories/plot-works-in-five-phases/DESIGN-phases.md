@@ -13,7 +13,7 @@ The phases of a team's workflow are configuration. Plot knows plan states, story
 
 > **Story:** [Plot works in five phases](STORY-plot-works-in-five-phases.md)
 >
-> **Decisions:** every decision in this spec is one of the twelve that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D12). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
+> **Decisions:** every decision in this spec is one of the twenty that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D20). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
 
 ## Contents
 
@@ -37,7 +37,7 @@ Measured on `main` at `75f093cb9`, 2026-10-12.
 - `rules/phase.ts:41` `toBoardPhase` maps `draft` to Discovery, `design` to Design, `approved` to Development, `delivered` to Testing and `released` to Released, and `rejected` and `superseded` to `null`. `rules/phase.ts:72` `storyPhase` maps story `draft` to Discovery, `ready` to Design, `active` and `paused` to Development, `in-review` to Testing and `done` to Released. `rules/phase.ts:99` `rowPhase` composes `toBoardPhase`.
 - `packages/board/src/server/board.ts:2082-2117` moves a plan whose `planStatus` (`rules/phase.ts:147`) is `deliverable` into the column of `toBoardPhase('delivered')`.
 - Seven plan states exist: `draft`, `design`, `approved`, `delivered`, `released`, `rejected`, `superseded` (`transitions/plan.ts:22`, `entities/plan.ts:100-118`, `rules/phase-gate.ts:4-20`). `skills/plot/scripts/plot-plan-meta.sh:94` documents `design` as a phase of its own, and `:246` reads a `Design:` record.
-- No command writes `State: Design`. The state gate's `owningCommand` (`rules/state-transition.ts:93`) names only `/plot-approve` and `/plot-deliver` for a plan, so a commit that changes `Draft` to `Design` in an existing plan is refused. The board's *Commission design* route (`packages/board/src/server/commission.ts:136-177`) asks an agent to make that edit and to add an empty `## Spec` section.
+- No command writes `State: Design`. The state gate admits a change of `State:` only when a receipt for that path and value exists (`packages/board/src/server/entry/gate.ts:248-253`), and no command writes a receipt for `Design`, so a commit that changes `Draft` to `Design` in an existing plan is refused. `owningCommand` (`rules/state-transition.ts:93-105`) only builds the refusal text, which names `/plot-approve` and `/plot-deliver`. The board's *Commission design* route (`packages/board/src/server/commission.ts:136-177`) asks an agent to make that edit and to add an empty `## Spec` section.
 - The board has three tabs, `stories`, `plans` and `agents` (`packages/board/src/app/App.tsx:118`, `?tab=`; `?tab=board` redirects to `plans`).
 - The tracker port lists open issues only (`ports/tracker.ts:108`). `Issue` carries no assignee and no closing date by stated design (`entities/issue.ts:21-23`), and the status write refuses to widen to a label or an assignee (`ports/tracker.ts:31-41`).
 - The fleet dispatches `approved` plans only (`rules/eligible.ts:43`) and treats `delivered` and `released` as finished (`rules/eligible.ts:61`).
@@ -52,7 +52,7 @@ Plot knows three kinds of fact, and only these (D12):
 |---|---|---|
 | Plan state | `draft`, `design`, `approved`, `delivered`, `released`, `rejected`, `superseded` | `State:` in the plan's `## Status` block |
 | Story status | `draft`, `ready`, `active`, `in-review`, `paused`, `done` | `status:` in the story's front matter |
-| Plan marker | `design` (the state itself), `spike` (on one slice), `tracer` (on the plan) | the plan file, see §4 |
+| Plan marker | `design` (the state itself), `spike` (on one slice), `Tracer: yes` (on the plan, D15) | the plan file, see §4 |
 
 A phase name is not a Plot fact. It comes from the operator's workflow.
 
@@ -71,7 +71,7 @@ A `## Plot Config` key declares the phases (D12). The key name and its value gra
 - `plan:rejected` and `plan:superseded` cannot be declared. They stay off the board (D2).
 - A phase name is any text without `;`, `=` or `,`.
 
-The shape follows `Local checks`, whose `;`-separated `pattern = command` value `rules/local-checks.ts` parses as a value.
+The shape follows `Local checks`, whose `;`-separated `pattern = command` value `rules/local-checks.ts:73-82` parses as a value. The two parsers share only the split: `parseLocalChecks` skips a malformed entry, and `parsePhaseMap` refuses it.
 
 ### The default
 
@@ -92,7 +92,7 @@ The parse rule returns either a phase map or a refusal that names the entry and 
 
 The domain rule takes readings as values, as CLAUDE.md's note on shape requires: the board reads the key, the domain parses and answers, and no rule awaits a port.
 
-`PHASE_LEADERSHIP` stays keyed by the five default names. A declared phase whose name is not one of them renders with no leadership badge (*proposed*). `PHASE_WORKFLOWS` is derived from the map: a lifecycle workflow belongs to the phase that holds the state it moves a plan out of. With the default map, `approve` belongs to Design, `dispatch`, `implement` and `deliver` to Development, and `release` to Testing, which is the assignment the constant holds today.
+`PHASE_LEADERSHIP` stays keyed by the five default names. A declared phase whose name is not one of them renders with no leadership badge (*proposed*). `PHASE_WORKFLOWS` is derived from the map: a lifecycle workflow belongs to the first declared phase that holds a state it acts on. `approve` acts on `draft` and `design`, `dispatch`, `implement` and `deliver` act on `approved`, and `release` acts on `delivered`. With the default map, `approve` belongs to Design, `dispatch`, `implement` and `deliver` to Development, and `release` to Testing, which is the assignment the constant holds today.
 
 ## 3. State to phase
 
@@ -111,7 +111,7 @@ With the default map (D2):
 
 Three readings refine the state, in this order:
 
-1. **A tracer plan** reads in the phase that holds `plan:design`, in every state but `released` (D5). It never reads in Development or Testing.
+1. **A tracer plan** (`Tracer: yes`, D15) reads in the phase that holds `plan:design`, in every state but `released` (D5, D14). It never reads in Development or Testing.
 2. **A deliverable plan** (`planStatus` is `deliverable`: approved, every non-deferred slice merged) reads in the phase that holds `plan:delivered`. This is today's auto-bump, expressed against the map. The plan file does not change.
 3. **Every other plan** reads in the phase that holds its state.
 
@@ -138,7 +138,7 @@ Only a plan with significant design decisions gets design work (D3). Design work
 A plan enters `State: Design` in two ways, and the fleet decides neither (D3):
 
 - **At creation.** `/plot-idea`'s ceremony step asks *"Does this plan carry significant design decisions?"* On yes it writes `State: Design` and an empty `## Spec` section instead of `State: Draft`. A new file passes the state gate, because the gate admits a creation.
-- **Later.** A person runs the *Needs design* controller action on a Draft plan (the board shows it as a *Needs design* button). The action moves `Draft` to `Design`, writes a `Design:` record (`<date>, <who>, <channel>`, the field `plot-plan-meta.sh:246` already reads), adds the empty `## Spec` section, and leaves a receipt that the state gate accepts.
+- **Later.** A person runs the *Needs design* controller action on a Draft plan (the board shows it as a *Needs design* button). The action moves `Draft` to `Design`, writes a `Design:` record (`<date>, <who>, <channel>`, the shape of `Approved:`, in the field `plot-plan-meta.sh:246` already reads), and adds the empty `## Spec` section. Its bundle and endpoint write a state receipt for `Design` through `recordStateReceipt` (`server/entry/ladder.ts:64`), and that receipt admits the commit at the state gate. `owningCommand` gains a `design` arm that names the action in the refusal text; it admits nothing.
 
 An empty spec is a `## Spec` section that is absent or holds only the placeholder `_To be filled in during Design._`, which is the shape *Commission design* writes today (`commission.ts:136-177`).
 
@@ -149,6 +149,8 @@ A plan in Design names one slice as its spike (D4), with an annotation on the br
 ```markdown
 - `feature/the-seam-holds` <!-- spike --> — prove the seam against the real host
 ```
+
+The spike is the sole branch under the first slice heading. Approving the spike refuses `spike-not-first` otherwise, so every later slice reads `unapproved` until the plan is approved.
 
 ```mermaid
 stateDiagram-v2
@@ -169,27 +171,31 @@ stateDiagram-v2
     end note
 ```
 
-- **A person approves the spike alone.** The approval writes a `Spike approved:` record (`<date>, <who>, <channel>`) and leaves `State: Design`. The spike slice becomes dispatchable. Every other slice of the plan stays undispatchable.
-- **The fleet dispatches the spike like any slice** (D4, D10). Its PR is real code, and it lands on the default branch.
-- **The plan stays in Design after the merge.** A person then confirms the remaining slices, or rewrites them, and approves the plan. The confirm action writes a `Slices confirmed:` record and the usual `Approved:` record, and the plan moves to Development.
-- **Approval refuses a plan whose spike has not merged.** The refusal names the two ways forward: wait for the spike's merge, or remove the `spike` annotation.
+- **A person approves the spike alone.** The approval needs a named person on every review channel. It writes a `Spike approved:` record (`<date>, <who>, <channel>`) and leaves `State: Design`. For a `Review: pr` plan it merges the plan PR, so the plan with `State: Design` and the record reaches the default branch, where the fleet reads it (D13). The spike slice becomes dispatchable. Every other slice of the plan stays undispatchable.
+- **A gate holds the record.** The state gate extends from the `State:` line to the `Spike approved:` record, and refuses a commit that adds it without the receipt the spike approval leaves.
+- **The fleet dispatches the spike like any slice** (D4, D10). Its PR is real code, and it lands on the default branch. Five places refuse a slice of a plan that is not `approved` today, and each admits the approved spike and nothing else of the plan: `sliceVerdict`, the dispatch workflow's `plangate`, `plot-dispatch.sh`, the brief route of `implement`, and the commit-time `phaseGateRefusal`.
+- **The plan stays in Design after the merge.** A person then confirms the remaining slices, or rewrites them, and approves the plan. The second approval is a person's act on every review channel: a plan with a `Spike approved:` record approves through the in-session arm, with `--who` from `People`, even when its `Review:` field reads `pr` and its plan PR has merged (D10, D13). The confirm action writes a `Slices confirmed:` record and the usual `Approved:` record, and the plan moves to Development.
+- **Approval refuses a plan whose spike has not merged.** The reading is the host's `mergedAt` for the spike's PR. The refusal names the two ways forward: wait for the spike's merge, or remove the `spike` annotation.
+- **A release cut while the plan is in Design** ships the spike's changeset, and the release cross-check lists it as a spike of a Design plan (D16).
+- **A plan dropped after its spike merged** keeps the spike's code on the default branch. A revert is a slice of a new plan (D17).
 
 ### The tracer bullet
 
-A tracer-bullet plan is a full plan that proves a path other plans need (D5). It carries `Type: tracer` in its `## Status` block.
+A tracer-bullet plan is a full plan that proves a path other plans need (D5). It carries a `Tracer: yes` line in its `## Status` block, and its `Type:` keeps `feature`, `bug`, `docs` or `infra` (D15).
 
 - It is approved and dispatched like any plan.
 - It reads in the Design column in every state but `released` (§3).
 - When all its slices merge, its status reads `proven`.
 - A dependent plan waits on it through the existing `waits:` annotation (`docs/plans/2026-09-01-a-slice-can-wait-on-another-plan.md`): a dependent slice names a tracer branch, and the merge of that branch unblocks it. This mechanism needs no change.
-- It is released with the first dependent that ships. Automatic delivery skips a tracer plan. When `/plot-deliver` delivers a plan with a slice that waits on a branch of a proven tracer plan, it delivers that tracer plan in the same step, and the next release carries both (*proposed*).
+- It is released with the first dependent that ships (D5). Automatic delivery skips a tracer plan on its own. When automatic delivery or `/plot-deliver` delivers a plan with a slice that waits on a branch of a proven tracer plan, it carries that tracer plan in the same step, and the next release carries both. The deliver workflow writes `State: Delivered` into both plan files, so it records a second state receipt, one per plan file.
+- A person may deliver a proven tracer plan that has no dependent alone (D14). It stays in the Design column until it is released.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     [*] --> Approved: approved like any plan
     Approved --> Proven: every slice merged
-    Proven --> Delivered: delivered with its first dependent
+    Proven --> Delivered: carried with its first dependent, or by a person alone
     Delivered --> Released: released with that dependent
     note right of Proven
         Reads in the Design column
@@ -211,24 +217,26 @@ The board has three tabs, Discovery, Planning and Delivery (D6). The names are f
 
 The Discovery tab shows the tag cloud, a tickets lane group and a stories lane group, as separate lanes (D7).
 
-**Ticket lanes.** Open, In progress and Done. A ticket's lane comes from the tracker's own status category first (Jira). Where the tracker has none (GitHub Issues):
+**Ticket lanes.** Open, In progress and Done. A ticket's lane comes from the tracker's own status category first, which only Jira states. `plot-host.sh issue-list` derives a category for GitHub and Bitbucket from the state it asks for (every open GitHub issue reads `To Do`, `:4730-4736`), and the lane ignores a derived category, so those trackers read as having none:
 
 | Ticket | Lane |
 |---|---|
-| category `To Do` | Open |
-| category `In Progress` | In progress |
-| category `Done` | Done |
-| no category, open, no plan's `Issue:` names it | Open |
-| no category, open, a plan's `Issue:` names it | In progress |
-| no category, closed | Done |
+| stated category `To Do` | Open |
+| stated category `In Progress` | In progress |
+| stated category `Done` | Done |
+| no stated category, open, no plan's `Issue:` names it | Open |
+| no stated category, open, a plan's `Issue:` names it | In progress |
+| no stated category, closed | Done |
 
 Done shows tickets closed in the last 14 days.
 
 **Story lanes.** Draft holds `draft`, `ready` and `paused`. Active holds `active` and `in-review`. Done holds `done` stories that are not archived.
 
-**The released toggle.** One tab-wide toggle shows released and archived items: an Archived lane with every archived story, and every closed ticket in Done.
+**The released toggle.** One tab-wide toggle shows released and archived items: an Archived lane with every archived story, and every closed ticket in Done. The tab keeps it per viewer in `?archived=1`. The Planning tab keeps `?released=1` for *Show released*, so the two toggles stay two (`App.tsx:633-638` keeps every parameter on a tab switch).
 
-The tracker port lists closed issues, and the board reads them through the index (D7). The fleet stays the index's one writer.
+**Retention (D19).** The tracker port lists closed issues. The issue index holds the open tickets and the tickets closed in the last 14 days, and the board reads them through the index (D7). With the toggle on, the tab reads every closed ticket from the host on demand, capped at 1000, and that answer is not written to the index. The fleet stays the index's one writer.
+
+**Scope (D20).** On Jira the lanes show every ticket of the declared projects, not only the current user's: the open and closed reads drop the `assignee = currentUser()` clause that the Jira inbox reads today (`plot-host.sh:4684`). The drop lands only after the Delivery tab's assignee filter exists (*Delivery* below), because the inbox and the lanes read the same rows.
 
 ### Planning
 
@@ -238,7 +246,7 @@ The Planning tab keeps the sprint filter, the story filter, the *Story lanes* to
 
 The Delivery tab is today's Agents tab (D9).
 
-- **Waiting on you** keeps today's content: tickets, broken agents, and Draft plans with no branch. By default its ticket rows show only tickets assigned to the current user. This needs the tracker's assignee on `Issue`, a read the entity refuses today (§1). D9 decides the read.
+- **Waiting on you** keeps today's content: tickets, broken agents, Draft plans with no branch, and a failed verification run (§6). By default its ticket rows show only tickets assigned to the current user. This needs the tracker's assignee on `Issue`, a read the entity refuses today (§1). D9 decides the read. Today the Jira rows are the user's only because the query reads `assignee = currentUser()`. After D20 the list is project-wide, so D9's default is a filter on `Issue.assignee`, and the filter needs the match between a tracker account and the reader (story Open Point 7). The Delivery inbox does not read the project-wide list before that filter exists.
 - **Active sprint** is a toggle. On, the tab shows only the plans of the active sprint and their items: PRs, branches, builds and agents.
 - **Only my work** filters tickets, branches, PRs, plans and builds associated with the current user.
 
@@ -254,13 +262,16 @@ The fleet reads plan states and markers. It never reads a phase name (D12).
 
 ### In Testing
 
-For each Delivered plan the fleet runs a verification panel against the merged work on the default branch (D11):
+For each Delivered plan the fleet runs a verification panel against the merged work on the default branch (D11). This includes a plan that `/plot-deliver` step 5 already panelled at delivery, which the fleet verifies again (D18).
 
-1. Each Changelog entry and acceptance claim of the plan is one claim. Each juror judges a claim `supported` or `refuted`, through the `plot-panel` mechanism and the vocabulary `/plot-deliver` step 5 already uses.
-2. The fleet writes a verification record into the plan: a `Verified:` line in `## Status` and a `## Verification` section with one line per claim.
-3. The fleet opens one issue per refuted claim, labelled `ai-generated`, through the tracker port. This is a new write to a tracker, which D11 decides.
-4. A plan with a refuted claim is flagged on the board.
-5. The fleet produces a manual release checklist for the endgame round of human testing, building on the checklist `/plot-release rc` writes to `docs/releases/v<version>-checklist.md`.
+1. **The pinned commit.** A run judges the plan at its delivery commit, the commit on the default branch that added the `Delivered:` record, in a detached worktree. A later plan cannot refute an earlier claim. The record names the commit.
+2. **The claims.** Each Changelog entry and acceptance claim of the plan is one claim. The run is `/plot-deliver --verify <slug>`, which uses step 5's lenses, rubric and the vocabulary `supported` and `refuted` through the `plot-panel` mechanism. Each juror commits one gated label per claim, `Claim-<n>: supported | refuted`, beside step 5's `Position` and `Evidence` lines; a juror file that omits a label is refused. A domain fold gives one line per claim, and one refutation decides.
+3. **The record.** The fleet writes a `Verified:` line in `## Status` and a `## Verification` section with one line per claim.
+4. **The issues.** The fleet opens one issue per refuted claim, labelled `ai-generated`, through the tracker port. This is a new write to a tracker, which D11 decides. The port resolves through the issue source (`trackerForIssues`), and the git host's issue connector is read-only, so a repository with no `Tracker` key answers `unaskable` and opens nothing. This repository declares no `Tracker` key, so its own runs open no issue, and the claim's line says so.
+5. **The flag.** A plan with a refuted claim is flagged on the board, and `/plot-release` lists it before a cut. A failed run shows in *Waiting on you*.
+6. **The checklist.** The fleet keeps a manual release checklist for the endgame round of human testing in `docs/releases/vnext-checklist.md`, in the shape of the checklist `/plot-release rc` writes to `docs/releases/v<version>-checklist.md`. `/plot-release rc` renames it.
+
+Two `## Plot Config` keys govern the run. `Verify command` names the runner, and an absent key starts nothing. `Auto-verify` turns the run on, and it defaults off. One run is one process against `Parallel agents`, and the fleet runs one verification at a time. The fleet never re-runs a plan that has a record; a person re-verifies with `/plot-deliver --verify <slug> [--at <sha>]`.
 
 Release stays a person's act (D11). The fleet fills no sign-off line, which `/plot-release` already forbids an agent.
 
@@ -272,6 +283,8 @@ Release stays a person's act (D11). The fleet fills no sign-off line, which `/pl
 | Approving a spike | a person | D4 |
 | Confirming the slices after a spike and approving the plan | a person | D4, D10 |
 | Approving any plan | a person | D10 |
+| Delivering a tracer plan with no dependent | a person | D14 |
+| Re-verifying a recorded plan | a person, with `/plot-deliver --verify` | D11, D18 |
 | Releasing | a person | D11 |
 | Declaring the phases | the operator, in `## Plot Config` | D12 |
 
@@ -281,21 +294,23 @@ Every view state in this story is a domain property, per CLAUDE.md's *Every rend
 
 | Rule | New or changed | Plan |
 |---|---|---|
-| `parsePhaseMap(value)`, `DEFAULT_PHASE_MAP` | new | `the-phases-are-declared` |
+| `parsePhaseMap(value)`, `DEFAULT_PHASE_MAP`, `planPhases(map)` | new | `the-phases-are-declared` |
 | `phaseOfPlan(map, readings)`, `phaseOfStory(map, status)` | new; replace `toBoardPhase` and `storyPhase` | `the-phases-are-declared` |
 | `phaseWorkflows(map)` | new; replaces the `PHASE_WORKFLOWS` constant | `the-phases-are-declared` |
 | `needsDesign(plan, input)` | new transition, `draft` to `design` | `the-phases-are-declared` |
-| `owningCommand` | changed; names *Needs design* for `design` | `the-phases-are-declared` |
-| `spikeOf(plan)`, `approveSpike(plan, input)` | new | `design-work-proves-the-path` |
+| `owningCommand` | changed; names *Needs design* for `design` in the refusal text; the state receipt admits the write | `the-phases-are-declared` |
+| `spikeOf(slices)`, `approveSpike(plan, input)`, `spikeApprovalOf(text)` | new | `design-work-proves-the-path` |
 | `approve` | changed; refuses `spike-unmerged`, records `Slices confirmed:` | `design-work-proves-the-path` |
 | `sliceVerdict` | changed; an approved spike of a Design plan is dispatchable | `design-work-proves-the-path` |
 | `planStatus` | changed; adds `proven` for a tracer plan | `design-work-proves-the-path` |
+| `phaseGateRefusal`, `plangate` | changed; admit the approved spike branch of a Design plan | `design-work-proves-the-path` |
 | `boardTabOf(param)` | new | `the-board-has-three-tabs` |
 | `planningColumns(map, showReleased)` | new | `the-board-has-three-tabs` |
 | `waitingTickets(issues, reader)`, `activeSprintScope(rows, sprints)` | new | `the-board-has-three-tabs` |
-| `ticketLane(issue, namedByPlan, now)`, `storyLane(story)` | new | `tickets-and-stories-have-lanes` |
+| `ticketLane(issue, reading, now)`, `storyLanes(map)`, `storyLane(map, standing, location)` | new | `tickets-and-stories-have-lanes` |
+| `trackerForIssues(declared, gitHost, context)` | new adapter resolver | `tickets-and-stories-have-lanes` |
 | `specIsEmpty(planText)`, `designWork(plan)` | new | `the-fleet-writes-the-design` |
-| `verificationOf(plan)`, `refutedClaims(record)` | new | `the-fleet-verifies-what-it-delivered` |
+| `claimsOf(plan)`, `verificationOf(plan)`, `refutedClaims(record)`, `foldVerification(claims, jurors)`, `verificationRow(plan, runState)` | new | `the-fleet-verifies-what-it-delivered` |
 
 ## 9. Out of scope
 

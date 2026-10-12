@@ -16,6 +16,8 @@
 - The Discovery tab shows tickets in three lanes, Open, In progress and Done, beside the stories in three lanes, Draft, Active and Done, under the tag cloud.
 - A ticket's lane follows the tracker's own status category where the tracker states one (Jira). On GitHub and Bitbucket, an open ticket that a plan's `Issue:` names is In progress, another open ticket is Open, and a closed ticket is Done. Done shows tickets closed in the last 14 days.
 - One toggle, kept in `?archived=1`, adds an Archived lane with every story under `docs/stories/archived/` and every closed ticket in Done. The Planning tab's *Show released* stays a separate control.
+- With the toggle on, the tab reads every closed ticket from the host on demand, up to 1000.
+- On Jira the lanes show every ticket of the declared `Ticket prefixes` projects, not only the tickets assigned to you. The Delivery tab's *Waiting on you* keeps showing only your tickets.
 - On Bitbucket the Done lane says that Bitbucket lists no closing date, and lists no closed ticket.
 
 <!-- Board impact: the Discovery tab replaces the stories view; the board reads docs/stories/archived/ for the Archived lane; a new issue index file under .plot/state/index/ written by fleetd. No change to the plan format, the template or the docs/plans layout. -->
@@ -46,7 +48,7 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 | Source | Closed read | `closedAt` |
 |---|---|---|
 | GitHub | `gh issue list --state closed --search "closed:>=<since>" --json number,title,url,createdAt,closedAt --limit <n>` | `closedAt` |
-| Jira | `project IN (<Ticket prefixes>) AND resolved >= "<since>"`, with today's assignee clause, `ORDER BY resolved DESC`, `nextPageToken` loop to `<n>` | `resolutiondate` |
+| Jira | `project IN (<Ticket prefixes>) AND resolved >= "<since>"`, with today's assignee clause until *The Jira project scope* below drops it, `ORDER BY resolved DESC`, `nextPageToken` loop to `<n>` | `resolutiondate` |
 | Bitbucket | exit 4: `bb issue list` prints no closing date | — |
 
 The Jira closed read requires `Ticket prefixes`: with none declared it exits 4 with the reason, because an unscoped `resolved >=` query reads the whole instance (`plot-host.sh` `tracker_projects`). `PLOT_JIRA_JQL` overrides the open inbox only, and the closed read does not read it. A read that returns `<n>` rows reports `complete: false`. Each arm records one budget call per page: the GitHub arm records one `budget_record_call` per 100 rows past the first, because the `gh` wrapper records one call per process (`plot-host.sh:3382-3388`), and `jira_curl` records each page itself (`:2648`).
@@ -62,7 +64,9 @@ The Jira closed read requires `Ticket prefixes`: with none declared it exits 4 w
 
 **The board's read.** The board follows the PR store's switch, `fleetOwnsPrs` (`fleet.ts:1619`), and not the file's validity. With a fleet, it reads the issue index and asks the host nothing; a missing file shows *the fleet has left no issue index to read*, as `readPrsFromStore` does (`fleet.ts:1636`). With no fleet, `refreshIssues` reads the open list and the 14-day closed list itself into memory, on the same gate as today, and writes no file. In both modes the inbox (`entry.issues`) and the lanes come from the same rows, so one ticket cannot show two states on two tabs. A `nobody`, `unaskable` or `failed` answer reaches the lanes as `issueAbsence` text, never as three empty lanes.
 
-**The toggle's closed read.** With the toggle on, the tab asks `GET /api/issues/closed`, which calls `issueListClosed` with no `since` and `limit` 1000, on demand, at a person's cadence, as `issueView` reads a body (`ports/tracker.ts:113-114`). The answer is not written to the index. Only the 14-day rows ride the board payload; no closed row rides the 4 s `/api/fleet` payload (`App.tsx:32`). Story Open Point 8 stays open below, because D7's last sentence also reads on the toggle.
+**The toggle's closed read.** With the toggle on, the tab asks `GET /api/issues/closed`, which calls `issueListClosed` with no `since` and `limit` 1000, on demand, at a person's cadence, as `issueView` reads a body (`ports/tracker.ts:113-114`). The answer is not written to the index. Only the 14-day rows ride the board payload; no closed row rides the 4 s `/api/fleet` payload (`App.tsx:32`). D19 decides this retention: the index holds the open tickets and the tickets closed in the last 14 days, and the toggle reads every closed ticket from the host on demand, capped at 1000.
+
+**The Jira project scope (D20).** The Discovery lanes show every Jira ticket of the `Ticket prefixes` projects. The Jira open read (`plot-host.sh:4684`) and the closed read drop the clause `assignee = currentUser()` and keep `resolution = EMPTY` and the project scope; `PLOT_JIRA_JQL` keeps overriding the open read. Today the Delivery tab's Jira rows are the user's only because of that clause, and the inbox and the lanes read the same rows (*The board's read*). So the drop is its own slice, `feature/the-lanes-read-the-whole-jira-project`, and it waits on `feature/the-delivery-tab-filters-by-sprint-and-owner` of `the-board-has-three-tabs`, which filters *Waiting on you* by `Issue.assignee` (D9). That filter matches a Jira account to the reader through story Open Point 7, which is still open, so the slice cannot start before Open Point 7 is decided. Until it lands, both Jira reads keep the clause, and the lanes show the reader's Jira tickets.
 
 **The ticket lane.** `ticketLane(issue, reading, now)` in `packages/domain/src/rules/ticket-lane.ts` answers `open`, `in-progress`, `done` or `hidden`. `reading` holds `categoryStated` and `namedByPlan`. `categoryStated` is true only for the `jira` source: the GitHub and Bitbucket arms derive a category from the state they ask for, and D7 places those trackers under "no category". So `ticketLane` ignores a derived category.
 
@@ -98,15 +102,8 @@ Archived means the location: a story moved under `docs/stories/archived/`, as th
 
 ### Open Points
 
-- [ ] **Needs operator decision. How many closed tickets the index holds** (story Open Point 8). D7 fixes Done to 14 days and the toggle to every closed ticket, and its last sentence says the closed list is read through the index.
-  - (a) The index holds 14 days; the toggle reads every closed ticket on demand, outside the index (the plan default above).
-  - (b) The index holds every closed ticket: a paginated full read on the first pass and once a day, the 14-day window on every pass, served to the client only with the toggle on.
-  - (c) The index holds a declared number of days, a `## Plot Config` key with 14 as the default.
-  - Recommendation: (a). It bounds the file, the pass and the payload, and spends the full read only when a person asks; (b) costs up to 10 GraphQL pages per day at the 1000 cap on GitHub.
-- [ ] **Needs operator decision. Which Jira tickets the lanes show.** The Jira inbox lists `assignee = currentUser()` (`plot-host.sh:4684`), so on Jira the lanes show the reader's tickets, while on GitHub they show the repository's.
-  - (a) Keep the assignee clause for the open and closed reads (the plan default): the lanes show my tickets on Jira.
-  - (b) Drop the assignee clause and keep the project scope: the lanes show the project's tickets, and *Waiting on you* shows only mine once D9's filter and story Open Point 7 land.
-  - Recommendation: (b) after story Open Point 7 is decided, (a) until then, so the Delivery inbox does not widen before its filter exists.
+- [x] How many closed tickets the index holds (story Open Point 8). — resolved by D19: open tickets plus the tickets closed in the last 14 days; the toggle reads every closed ticket from the host on demand, capped at 1000. This was option (a), the plan default.
+- [x] Which Jira tickets the lanes show. — resolved by D20: the project's tickets, option (b). The assignee clause leaves in `feature/the-lanes-read-the-whole-jira-project`, which waits on the Delivery tab's assignee filter, so the Delivery inbox never widens before its filter exists. The filter's Jira match is story Open Point 7, which stays open.
 - [x] [Domain] The ticket source. Resolved: `trackerForIssues` follows `issueSource`, a read-only `trackerGitHost` connector lists for a repository with no `Tracker` key, and the Bitbucket closed read exits 4 with a stated reason. — *panel round 1: estate, contradiction, cost and deliverable*
 - [x] [Domain] The In progress rule on GitHub. Resolved: `ticketLane` reads `categoryStated`, true only for Jira, so it ignores the category that `plot-host.sh:4730-4736` derives; the Motivation names `Issue.statusCategory` (`issue.ts:58`). — *panel round 1: estate, deliverable, cost*
 - [x] [Technical] The index writer and its delta. Resolved: fleetd's `refreshIssueIndex`, called from `fleetPrs` on the PR gate, replaces the file whole each pass over two bounded sets, so no watermark, `updatedAt` or separate full read exists; the board switches on `fleetOwnsPrs`, its 60 s call stops under a fleet, `PR_REQUESTS_PER_REFRESH.github` becomes 2, and the fetch's answer is kept in the file. — *panel round 1: contradiction, estate, deliverable, cost*
@@ -130,6 +127,7 @@ Archived means the location: a story moved under `docs/stories/archived/`, as th
 - On this repository (no `Tracker` key, GitHub), `plot-host.sh issue-list --state closed --since <now−14d>` prints issues with a non-empty `closedAt`, and `trackerForIssues('', 'github', …).issueListClosed` answers them.
 - On Bitbucket, `plot-host.sh issue-list --state closed` exits 4 with a reason and runs no `bb` command.
 - With Jira and no `Ticket prefixes`, the closed read exits 4 and runs no `curl`.
+- After `feature/the-lanes-read-the-whole-jira-project`, the Jira open and closed reads build a JQL with no `assignee` clause, and *Waiting on you* still shows only the reader's Jira tickets.
 - A unit test per row of the ticket table and the story table; an open GitHub issue named by a plan reads In progress although its derived category is `To Do`.
 - `storyLanes` over a map that declares no `story:paused` returns Draft without `paused`, and over `DEFAULT_PHASE_MAP` returns Draft, Active and Done.
 - `one-issue-index-writer.test.ts` finds one caller of `encodeIssueIndex`, in `packages/fleet/src/shared/issue-refresh.ts`.
@@ -149,11 +147,15 @@ Archived means the location: a story moved under `docs/stories/archived/`, as th
 
 ### The issue index
 
-- `feature/the-fleet-indexes-issues` — `entities/issue-index.ts` with its decoder, encoder and version; the file adapter and `PLOT_ISSUE_INDEX_HOME` in `owned-run.sh`; `refreshIssueIndex` in `packages/fleet/src/shared/issue-refresh.ts` called from `fleetPrs`; `PR_REQUESTS_PER_REFRESH.github` 2; the one-writer test; the board reads the index under `fleetOwnsPrs`, reads in memory without a fleet, and applies the inbox filter at its read <!-- builds: the issue index, its fleetd writer and its decoder -->
+- `feature/the-fleet-indexes-issues` — `entities/issue-index.ts` with its decoder, encoder and version; the file adapter and `PLOT_ISSUE_INDEX_HOME` in `owned-run.sh`; `refreshIssueIndex` in `packages/fleet/src/shared/issue-refresh.ts` called from `fleetPrs`; `PR_REQUESTS_PER_REFRESH.github` 2; the one-writer test; the board reads the index under `fleetOwnsPrs`, reads in memory without a fleet, and applies the inbox filter at its read; `CLAUDE.md` *A Decision Reads The Index* names the issue index as a second fleetd-written index, and `AGENTS.md` follows <!-- builds: the issue index, its fleetd writer and its decoder -->
 
 ### The lanes
 
 - `feature/tickets-and-stories-have-lanes` <!-- waits: feature/the-tabs-are-discovery-planning-delivery --> — `ticketLane`, `storyLanes` and `storyLane`; the lanes on the board payload; `GET /api/issues/closed`; the Discovery tab with the tag cloud, the tickets lane group, the stories lane group and the `?archived=1` toggle <!-- builds: ticketLane, storyLanes, storyLane and the Discovery tab's lanes -->
+
+### The Jira project scope
+
+- `feature/the-lanes-read-the-whole-jira-project` <!-- waits: feature/the-delivery-tab-filters-by-sprint-and-owner --> — the Jira open read at `plot-host.sh:4684` and the Jira closed read drop `assignee = currentUser()` and keep the project scope; the contract tests; the net shell line count; starts only after story Open Point 7 is decided <!-- builds: the project-wide Jira reads -->
 
 ## Notes
 
@@ -161,3 +163,4 @@ Archived means the location: a story moved under `docs/stories/archived/`, as th
 - 2026-10-12: the lanes slice waits on `feature/the-tabs-are-discovery-planning-delivery` of `the-board-has-three-tabs`, because the Discovery tab exists only after that slice; that slice waits on `feature/the-board-draws-the-declared-phases`, so `phaseOfStory` exists before the lanes. The readings and the index wait on nothing outside this plan.
 - 2026-10-12, deliverable search (`plot-deliverable-search.sh`): `closedIssue` and `issueIndex` returned no artifact; the issue matches are agent-log kinds (`idea-issue`, `story-issue`). `ticketLane` and `storyLane` returned no artifact. `archived` returned `StoriesTab.tsx`, whose Draft, Active, Done and Archived grouping this plan moves into `storyLane`, and `App.tsx`. `topics` returned `StoriesTab.tsx` and `App.tsx`; the tag cloud and `server/topics.ts` stay as they are.
 - 2026-10-12: revised after panel round 1 (`.plot/panels/2026-10-12-tickets-and-stories-have-lanes/`). Cross-plan changes this revision needs, not made here: `DESIGN-phases.md` §5 says GitHub has no category (`:214`) and should say the GitHub arm derives one that the lane ignores, and should name `?archived=1`; `the-board-has-three-tabs` should state that `?released=1` belongs to the Planning tab alone, and that its `Issue.assignee` joins `IssueIndexSchema` if it lands after the index; `the-fleet-verifies-what-it-delivered` should resolve `issueOpen` through `trackerForIssues` so a repository with no `Tracker` key opens issues on its git host or answers `unaskable` by the same decision; the story's Open Point 8 should name the three options above; `CLAUDE.md` *A Decision Reads The Index* should name the issue index as a second fleetd-written index.
+- 2026-10-12, decisions D19 and D20: both operator decisions are resolved. D20 adds the last wave, whose wait keeps the Delivery inbox narrow until its assignee filter exists. The cross-plan changes in the previous note are applied in `DESIGN-phases.md` §5, `the-board-has-three-tabs`, `the-fleet-verifies-what-it-delivered` and the story's Open Points, and the issue-index slice names the `CLAUDE.md` edit.

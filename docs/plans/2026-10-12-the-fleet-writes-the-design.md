@@ -24,7 +24,7 @@ D10 in [the story](../stories/plot-works-in-five-phases/STORY-plot-works-in-five
 
 - *Commission design* is a board route (`packages/board/src/server/commission.ts`). A person clicks it on a Draft plan, and an agent started with the `Idea command` moves the plan to Design and adds a `## Spec` section with the placeholder `_To be filled in during Design._`. Its prompt tells the agent not to write the spec (`commission.ts:136-177`).
 - `the-phases-are-declared` gives the move to Design to a person, through `/plot-idea` and *Needs design*. After it, *Commission design* is left with half its job.
-- Automatic dispatch reads `approved` plans only (`packages/domain/src/rules/auto-dispatch.ts:531`, `:582`, `:617`). `design-work-proves-the-path` makes an approved spike of a Design plan eligible for `/plot-dispatch`, and leaves automatic dispatch unchanged.
+- Automatic dispatch reads `approved` plans only (`packages/domain/src/rules/auto-dispatch.ts:531`, `:582`, `:617`). Five places refuse a slice of a plan that is not `approved`: `sliceVerdict` and the scan's verdict column (`rules/eligible.ts:43`), the dispatch workflow's `plangate` (`workflows/dispatch.ts:527-546`), the shell copy in `plot-dispatch.sh:2957-2978`, the brief route (`workflows/implement.ts:131-138`) and the commit-time `phaseGateRefusal` (`rules/phase-gate.ts:185-192`). `design-work-proves-the-path` admits an approved spike of a Design plan at all five in its branch `feature/the-spike-can-be-dispatched`, and leaves automatic dispatch unchanged.
 
 ## Design
 
@@ -40,7 +40,7 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 | `State: Design`, `Spike approved:` record, spike not merged and not claimed | `dispatch-spike` |
 | anything else | `none` |
 
-**Writing the spec.** `plot-fleetd` starts a spec agent for a `write-spec` plan, through the layering rule: the fleet's controller asks `designWork`, and an adapter starts the process. The agent runs the `Idea command`, as *Commission design* does today (`packages/fleet/src/shared/implement-run.ts:29`). The prompt is *Commission design*'s prompt turned around: read the plan and its story, write the spec into `## Spec`, change no `State:` line, approve nothing, write nothing to a tracker. The agent commits the spec onto the plan PR's head branch when one is open, and otherwise onto a new branch `idea/<slug>-spec` with a draft PR. A person merges it. The fleet records one spec run per plan in its state, so a failed or unmerged run is not started again; a failed run shows in the Delivery tab's *Waiting on you* with its log. The fleet's capacity counts a spec agent like any agent.
+**Writing the spec.** `plot-fleetd` starts a spec agent for a `write-spec` plan, through the layering rule: the fleet's controller asks `designWork`, and an adapter starts the process. The agent runs the `Idea command`, as *Commission design* does today (`packages/fleet/src/shared/implement-run.ts:29`). The prompt is *Commission design*'s prompt turned around: read the plan and its story, write the spec into `## Spec`, change no `State:` line, approve nothing, write nothing to a tracker. The agent commits the spec onto the plan PR's head branch when one is open, and otherwise onto a new branch `idea/<slug>-spec` with a draft PR. A person merges it. The fleet records one spec run per plan in its state, so a failed or unmerged run is not started again; a failed run shows in the Delivery tab's *Waiting on you* with its log. One spec run is one worker process. `Parallel agents` counts processes (`packages/fleet/src/server/entry/registryd-main.ts:980`), so a run counts as 1, and the fleet starts one only when the cap has a free slot, so a run never displaces a slice agent.
 
 **Dispatching the spike.** `planAutoDispatch` and `startableBranches` accept a `design` plan for its spike slice when `designWork` answers `dispatch-spike`. Every other slice of a Design plan stays out of automatic dispatch.
 
@@ -58,7 +58,7 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 
 ### What the fleet reads
 
-- `feature/the-fleet-reads-design-work` <!-- waits: feature/the-slices-are-confirmed-after-the-spike --> — `specIsEmpty` and `designWork` with unit tests over the table above <!-- builds: specIsEmpty and designWork -->
+- `feature/the-fleet-reads-design-work` <!-- waits: feature/the-spike-can-be-dispatched --> — `specIsEmpty` and `designWork` with unit tests over the table above <!-- builds: specIsEmpty and designWork -->
 
 ### The fleet acts
 
@@ -68,5 +68,5 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 ## Notes
 
 - 2026-10-12: drafted by an unattended `/plot-idea` batch run from jwloka's decisions of the same day. Type, Review and Impl came from the prompt.
-- 2026-10-12: the first slice waits on `feature/the-slices-are-confirmed-after-the-spike`, the last slice of `design-work-proves-the-path`, so the spike records and `spikeOf` exist. That slice itself follows `the-phases-are-declared`.
+- 2026-10-12: the first slice waits on `feature/the-spike-can-be-dispatched`, the third wave of `design-work-proves-the-path`. That wave opens only after the markers wave (`spikeOf`, `spike_approved_raw`) and the spike approval wave (`approveSpike`, the `Spike approved:` record) have merged, and it builds the spike's eligibility at all five dispatch gates. `designWork` reads nothing that `feature/the-slices-are-confirmed-after-the-spike` builds: it needs no `Slices confirmed:` record and no second approval. The wait moved from that branch on 2026-10-12.
 - 2026-10-12, deliverable search (`plot-deliverable-search.sh`): `specIsEmpty` returned no artifact, only reconcile scan headings that share the word *is*. `commission` returned `commission.ts` and `CommissionDesignButton.tsx` on the board, `agent-log.ts:319` (the `commission` log kind, which the spec agent reuses) and `implement-run.ts:29` in the fleet, and a comment in `rules/auto-dispatch.ts:671`. This plan replaces the board route with a fleet action and keeps the log kind.
