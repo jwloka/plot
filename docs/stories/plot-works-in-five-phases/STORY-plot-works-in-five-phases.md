@@ -20,7 +20,7 @@ The design spec is [DESIGN-phases.md](DESIGN-phases.md).
 
 ## Decisions Taken in Scoping
 
-Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`.
+Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`. Decisions D25 to D27 were taken on 2026-10-12 and answer Open Points 1 to 3.
 
 ## Current Plan
 
@@ -50,9 +50,9 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 
 ## Open Points
 
-- ⏸️ **1. The key and its grammar.** DESIGN-phases.md §2 proposes the key name `Workflow phases` and the value `Discovery = story:*; Design = plan:draft, plan:design; …`. D12 names the key only as an example. Confirm at the review of `the-phases-are-declared`.
-- ⏸️ **2. Leadership for a declared phase.** `PHASE_LEADERSHIP` is keyed by the five default names. The spec proposes no leadership badge for a phase name outside them. An alternative is a leadership part in the key's grammar.
-- ⏸️ **3. A story in a plan phase.** A custom map can put a story status into a phase that also holds plan states. The spec's default: the Discovery tab lists every story whatever phase holds it, and the Planning tab lists plans only. No decision covers a custom map of this shape.
+- ✅ **1. The key and its grammar.** Decided by D25: the key is `Workflow phases`, with the grammar of DESIGN-phases.md §2.
+- ✅ **2. Leadership for a declared phase.** Decided by D26: a declared phase outside the five default names renders as a column with no leadership badge and a neutral accent, and nothing refuses it.
+- ✅ **3. A story in a plan phase.** Decided by D27: stories stay in Discovery whatever the map says. The Discovery tab lists every story, and the Planning tab shows plans only.
 - ✅ **4. Where a `Review: pr` plan lives while its spike runs.** Decided by D13: approving the spike merges the plan PR with `State: Design`, and a person records the later approval in-session.
 - ✅ **5. Delivering and releasing a tracer plan.** Decided by D14 and D5: automatic delivery carries a proven tracer plan with its first dependent, and a person may deliver a tracer plan with no dependent alone; it stays in the Design column until released.
 - ✅ **6. How a tracer plan is marked.** Decided by D15: a separate `Tracer: yes` Status line, and `Type:` keeps `feature`, `bug`, `docs` or `infra`.
@@ -97,6 +97,9 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 | 2026-10-12 | D22. When the reader's account cannot be matched, *Waiting on you* shows every ticket, as today, and a sentence that names the missing match. | jwloka. Nothing is hidden silently. |
 | 2026-10-12 | D23. The Delivery tab's *Waiting on you* keeps today's Jira read, `assignee = currentUser()`, until `People` matches the reader (D21). D22's "an unmatched reader sees every ticket and a notice" applies only to sources other than Jira. The Discovery lanes still read the Jira project's tickets (D20). | jwloka. D20 with D22 widened every Jira adopter's inbox at upgrade, because no `People` entry carries a `jira:` spelling today (panel round 2). |
 | 2026-10-12 | D24. The issue index keeps the tickets closed in the last 14 days (D19 unchanged). The Done lane shows the 20 most recently closed tickets and a *show all done* link. | jwloka. 154 of the 194 closed issues on this repository (79 %) fall inside 14 days, so the window alone does not bound the lane (panel round 2). |
+| 2026-10-12 | D25. The key is `Workflow phases`, with the proposed grammar: one line, `;` between phases, `,` between members, and a `story:` or `plan:` prefix on every member, for example `- **Workflow phases:** Discovery = story:*; Design = plan:draft, plan:design; Development = plan:approved; Testing = plan:delivered; Released = plan:released`. | jwloka. Answers Open Point 1. |
+| 2026-10-12 | D26. A declared phase outside the five default names renders as a column with no leadership badge and a neutral accent. Nothing refuses it. | jwloka. Answers Open Point 2. |
+| 2026-10-12 | D27. Stories stay in Discovery whatever the map says. The Discovery tab lists every story, and the Planning tab shows plans only. | jwloka. D1 gives Discovery to stories. Answers Open Point 3. |
 
 ## Excluded from Scope
 
@@ -132,5 +135,9 @@ Panel round 2 questioned `tickets-and-stories-have-lanes` and answered `amend` u
 ### 2026-10-12 — Round-2 revisions and cross-plan alignment
 
 Round-2 revisions and cross-plan alignment. The changes that the round-2 revisions of `the-phases-are-declared`, `design-work-proves-the-path`, `tickets-and-stories-have-lanes` and `the-fleet-verifies-what-it-delivered` listed for other files were applied to `DESIGN-phases.md` §4, §5, §6 and §8, to Open Points 11 and 14, and to the six plans. No decision, slice branch or `Rounds:` value changed.
+
+### 2026-10-12 — Decisions D25 to D27
+
+jwloka took D25 (the `Workflow phases` key and its grammar), D26 (a phase outside the five default names has no leadership badge and a neutral accent) and D27 (stories stay in Discovery whatever the map says). Open Points 1 to 3 are closed, and `DESIGN-phases.md` and `the-phases-are-declared` carry the three decisions.
 
 ---

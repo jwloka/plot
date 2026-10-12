@@ -13,7 +13,7 @@ The phases of a team's workflow are configuration. Plot knows plan states, story
 
 > **Story:** [Plot works in five phases](STORY-plot-works-in-five-phases.md)
 >
-> **Decisions:** every decision in this spec is one of the twenty-four that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D24). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
+> **Decisions:** every decision in this spec is one of the twenty-seven that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D27). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
 
 ## Contents
 
@@ -58,7 +58,7 @@ A phase name is not a Plot fact. It comes from the operator's workflow.
 
 ### The key
 
-A `## Plot Config` key declares the phases (D12). The key name and its value grammar are *proposed* here.
+A `## Plot Config` key declares the phases (D12). The key name is `Workflow phases`, and its value is one line in the grammar below (D25).
 
 ```markdown
 - **Workflow phases:** Discovery = story:*; Design = plan:draft, plan:design; Development = plan:approved; Testing = plan:delivered; Released = plan:released
@@ -69,7 +69,7 @@ A `## Plot Config` key declares the phases (D12). The key name and its value gra
 - A member is `plan:<state>` or `story:<status>`. `story:*` means every story status. The prefix is required, because `draft` is both a plan state and a story status.
 - Each plan state and each story status belongs to at most one phase. A state or status that no phase holds is not on the board.
 - `plan:rejected` and `plan:superseded` cannot be declared. They stay off the board (D2).
-- A phase name is any text without `;`, `=` or `,`.
+- A phase name is any text without `;`, `=` or `,`. A name outside the five default names is valid, and nothing refuses it (D26).
 
 The shape follows `Local checks`, whose `;`-separated `pattern = command` value `rules/local-checks.ts:73-82` parses as a value. The two parsers share only the split: `parseLocalChecks` skips a malformed entry, and `parsePhaseMap` refuses it.
 
@@ -92,7 +92,7 @@ The parse rule returns either a phase map or a refusal that names the entry and 
 
 The domain rule takes readings as values, as CLAUDE.md's note on shape requires: the board reads the key, the domain parses and answers, and no rule awaits a port.
 
-`PHASE_LEADERSHIP` stays keyed by the five default names. A declared phase whose name is not one of them renders with no leadership badge (*proposed*). `PHASE_WORKFLOWS` is derived from the map: a lifecycle workflow belongs to the first declared phase that holds a state it acts on. `approve` acts on `draft` and `design`, `dispatch`, `implement` and `deliver` act on `approved`, and `release` acts on `delivered`. With the default map, `approve` belongs to Design, `dispatch`, `implement` and `deliver` to Development, and `release` to Testing, which is the assignment the constant holds today.
+`PHASE_LEADERSHIP` stays keyed by the five default names. A declared phase whose name is not one of them renders as a column with no leadership badge and a neutral accent (D26). `PHASE_WORKFLOWS` is derived from the map: a lifecycle workflow belongs to the first declared phase that holds a state it acts on. `approve` acts on `draft` and `design`, `dispatch`, `implement` and `deliver` act on `approved`, and `release` acts on `delivered`. With the default map, `approve` belongs to Design, `dispatch`, `implement` and `deliver` to Development, and `release` to Testing, which is the assignment the constant holds today.
 
 ## 3. State to phase
 
@@ -119,7 +119,7 @@ The plan file keeps its state words. Only the mapping changes (D2).
 
 ### Stories
 
-With the default map every story status is in Discovery (D1). Discovery holds only stories, and plans move through Design, Development, Testing and Released.
+With the default map every story status is in Discovery (D1). Discovery holds only stories, and plans move through Design, Development, Testing and Released. Stories stay in Discovery whatever the map says (D27): with a custom map that puts a story status into a phase that also holds plan states, the Discovery tab still lists every story, and the Planning tab shows plans only. The map decides only which empty story lanes the Discovery tab draws.
 
 | Story status | Phase | Change from today |
 |---|---|---|
@@ -240,7 +240,7 @@ The issue index keeps the tickets closed in the last 14 days (D19). The Done lan
 
 ### Planning
 
-The Planning tab keeps the sprint filter, the story filter, the *Story lanes* toggle and *Only my work* (D8). Its columns are the declared phases that hold plan states, in declared order. With the default map those are Design, Development and Testing. A *Show released* checkbox, off by default, adds the phase that holds `plan:released`.
+The Planning tab keeps the sprint filter, the story filter, the *Story lanes* toggle and *Only my work* (D8). Its columns are the declared phases that hold plan states, in declared order, and it shows plans only, never a story (D27). With the default map those are Design, Development and Testing. A *Show released* checkbox, off by default, adds the phase that holds `plan:released`.
 
 ### Delivery
 
