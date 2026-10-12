@@ -30,17 +30,20 @@ export interface SliceReadings {
    */
   branches: number;
   /**
-   * Whether the slice holds a branch annotated `<!-- spike -->`.
+   * Whether the slice holds the plan's spike, as `spikeOf` answers it over the
+   * whole plan: the one branch annotated `<!-- spike -->`, where exactly one is.
    *
    * Absent where the caller did not read the annotation, which is a different
-   * statement from `false`. {@link sliceVerdict} does not read it yet.
+   * statement from `false`. {@link sliceVerdict} admits a `design` plan's slice
+   * only where this and {@link SliceReadings.spikeApproved} both hold and the
+   * slice names one branch.
    */
   spike?: boolean;
   /**
    * Whether the plan carries a `Spike approved:` record.
    *
    * Absent where the caller did not read it, which is a different statement
-   * from `false`. {@link sliceVerdict} does not read it yet.
+   * from `false`. Read only together with {@link SliceReadings.spike}.
    */
   spikeApproved?: boolean;
 }
@@ -55,6 +58,9 @@ export interface SliceReadings {
  * those would inherit the good word.
  */
 const DISPATCHABLE_PHASE = 'approved';
+
+/** The phase whose one approved spike may be started before the plan is approved. */
+const SPIKE_PHASE = 'design';
 
 /**
  * The phases a plan cannot be dispatched from because it is FINISHED.
@@ -118,7 +124,14 @@ export const sliceVerdict = (
   // nobody can act on, and BEFORE the approval test because approving a plan
   // does not give a prose heading a branch.
   if (readings.branches === 0) return 'empty';
-  if (readings.phase !== DISPATCHABLE_PHASE) return 'unapproved';
+  // THE ONE EXCEPTION: a Design plan's spike slice, once `Spike approved:` is
+  // recorded, and only where the slice names the spike alone — a verdict
+  // admits every branch of its slice, so a sibling there would be admitted too.
+  // Both flags must read true; an absent flag is an unread one, and every other
+  // slice of the plan keeps reading `unapproved`.
+  const spikeAdmitted = readings.phase === SPIKE_PHASE && readings.branches === 1
+    && readings.spike === true && readings.spikeApproved === true;
+  if (readings.phase !== DISPATCHABLE_PHASE && !spikeAdmitted) return 'unapproved';
   return priorComplete ? 'eligible' : 'blocked';
 };
 
