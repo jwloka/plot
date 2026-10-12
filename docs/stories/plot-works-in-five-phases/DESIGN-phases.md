@@ -13,7 +13,7 @@ The phases of a team's workflow are configuration. Plot knows plan states, story
 
 > **Story:** [Plot works in five phases](STORY-plot-works-in-five-phases.md)
 >
-> **Decisions:** every decision in this spec is one of the twenty that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D20). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
+> **Decisions:** every decision in this spec is one of the twenty-two that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D22). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
 
 ## Contents
 
@@ -246,7 +246,9 @@ The Planning tab keeps the sprint filter, the story filter, the *Story lanes* to
 
 The Delivery tab is today's Agents tab (D9).
 
-- **Waiting on you** keeps today's content: tickets, broken agents, Draft plans with no branch, and a failed verification run (§6). By default its ticket rows show only tickets assigned to the current user. This needs the tracker's assignee on `Issue`, a read the entity refuses today (§1). D9 decides the read. Today the Jira rows are the user's only because the query reads `assignee = currentUser()`. After D20 the list is project-wide, so D9's default is a filter on `Issue.assignee`, and the filter needs the match between a tracker account and the reader (story Open Point 7). The Delivery inbox does not read the project-wide list before that filter exists.
+- **Waiting on you** keeps today's content: tickets, broken agents, Draft plans with no branch, and a failed verification run (§6). By default its ticket rows show only tickets assigned to the current user. This needs the tracker's assignee on `Issue`, a read the entity refuses today (§1). D9 decides the read. Today the Jira rows are the user's only because the query reads `assignee = currentUser()`. After D20 the list is project-wide, so D9's default is a filter on `Issue.assignee`. The Delivery inbox does not read the project-wide list before that filter exists.
+- **The assignee match (D21).** `People` keeps its form `handle = Spelling, Spelling; handle = Spelling` (`entities/person.ts:75` `parsePersonDirectory`), and a tracker account is one more spelling with a tracker prefix: `jwloka = Jan Wloka, jira:jan.wloka@quatico.com`. A spelling whose text before the first `:` names a tracker (`jira`) is that tracker's account. Today's parser already reads such a spelling as a spelling of the handle, so every existing `login = Name` entry keeps its meaning, and `plot-config.sh get People` and the config port's `config('People', '')` return the raw value unchanged; the domain parses it. The form is a comma spelling and not `Jan Wloka <jira:…>`, because today's parser would read `jan wloka <jira:…>` as one spelling and the display name `Jan Wloka` would stop resolving. The reader is the host login, resolved to a handle through `People`. A GitHub or Bitbucket assignee is a host login and resolves the same way. A Jira assignee resolves through the `jira:` spelling, and the Jira connector reads the assignee's `emailAddress`, or its `accountId` where Jira hides the email. The ticket is the reader's when both resolve to one handle.
+- **An unmatched reader (D22).** When the reader's host login resolves to no declared handle, or the ticket source is Jira and the reader's handle has no `jira:` spelling, *Waiting on you* shows every ticket, as today, and a sentence that names the missing match, for example *No Jira account is declared for jwloka in `People` — showing every ticket.* Nothing is hidden silently.
 - **Active sprint** is a toggle. On, the tab shows only the plans of the active sprint and their items: PRs, branches, builds and agents.
 - **Only my work** filters tickets, branches, PRs, plans and builds associated with the current user.
 
@@ -306,7 +308,8 @@ Every view state in this story is a domain property, per CLAUDE.md's *Every rend
 | `phaseGateRefusal`, `plangate` | changed; admit the approved spike branch of a Design plan | `design-work-proves-the-path` |
 | `boardTabOf(param)` | new | `the-board-has-three-tabs` |
 | `planningColumns(map, showReleased)` | new | `the-board-has-three-tabs` |
-| `waitingTickets(issues, reader)`, `activeSprintScope(rows, sprints)` | new | `the-board-has-three-tabs` |
+| `assigneeHandle(assignee, source, directory)` | new; reads `People` tracker spellings | `the-board-has-three-tabs` |
+| `waitingTickets(issues, reader, directory, source)`, `activeSprintScope(rows, sprints)` | new; `waitingTickets` answers the tickets and an unmatched-reader notice | `the-board-has-three-tabs` |
 | `ticketLane(issue, reading, now)`, `storyLanes(map)`, `storyLane(map, standing, location)` | new | `tickets-and-stories-have-lanes` |
 | `trackerForIssues(declared, gitHost, context)` | new adapter resolver | `tickets-and-stories-have-lanes` |
 | `specIsEmpty(planText)`, `designWork(plan)` | new | `the-fleet-writes-the-design` |

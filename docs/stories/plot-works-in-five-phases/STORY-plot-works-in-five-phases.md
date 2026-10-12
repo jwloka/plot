@@ -20,7 +20,7 @@ The design spec is [DESIGN-phases.md](DESIGN-phases.md).
 
 ## Decisions Taken in Scoping
 
-Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D20 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed.
+Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed.
 
 ## Current Plan
 
@@ -38,7 +38,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 
 ### Phase 4: Tickets and stories have lanes ⏸️
 
-- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and released toggle, and the project-wide Jira read (D20). Waits on Phase 3; the Jira slice waits on Phase 3's assignee filter and on Open Point 7.
+- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and released toggle, and the project-wide Jira read (D20). Waits on Phase 3; the Jira slice waits on Phase 3's assignee filter.
 
 ### Phase 5: The fleet writes the design ⏸️
 
@@ -56,7 +56,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 - ✅ **4. Where a `Review: pr` plan lives while its spike runs.** Decided by D13: approving the spike merges the plan PR with `State: Design`, and a person records the later approval in-session.
 - ✅ **5. Delivering and releasing a tracer plan.** Decided by D14 and D5: automatic delivery carries a proven tracer plan with its first dependent, and a person may deliver a tracer plan with no dependent alone; it stays in the Design column until released.
 - ✅ **6. How a tracer plan is marked.** Decided by D15: a separate `Tracer: yes` Status line, and `Type:` keeps `feature`, `bug`, `docs` or `infra`.
-- ⏸️ **7. The current user in a tracker.** D9 filters *Waiting on you* to tickets assigned to the current user. The reader is a git host login and a git email (`mine-filter.ts:119`). A Jira assignee is a Jira account. How the two are matched is not decided; the `People` key is a candidate. D20 makes this point a dependency: today the Delivery tab's Jira tickets are the user's only because the Jira query reads `assignee = currentUser()` (`plot-host.sh:4684`). D20 drops that clause for the Discovery lanes, so D9's default becomes a filter on `Issue.assignee`, and that filter needs this mapping. `the-board-has-three-tabs` and `tickets-and-stories-have-lanes` order their slices so that the Delivery inbox never reads the project-wide list before the filter exists.
+- ✅ **7. The current user in a tracker.** Decided by D21 and D22: the `People` key names each person's tracker account, the reader is the host login, and an unmatched reader sees every ticket with a sentence naming the missing match.
 - ✅ **8. How many closed tickets the index holds.** Decided by D19: open tickets plus closed tickets of the last 14 days; the released/archived toggle reads every closed ticket from the host on demand, capped at 1000.
 - ⏸️ **9. Where the fleet's spec commit goes.** The plan default in `the-fleet-writes-the-design`: onto the plan PR's head branch when one is open, otherwise onto a new `idea/<slug>-spec` branch with a PR that a person merges.
 - ⏸️ **10. The command a spec agent runs.** *Commission design* reuses the `Idea command` key today (`packages/fleet/src/shared/implement-run.ts:29`). The plan default keeps it; a `Design command` key is the alternative.
@@ -67,7 +67,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 - ✅ **15. The spike's changeset in a release cut while its plan is in Design.** Decided by D16: the changeset ships, and the release cross-check lists it as a spike of a Design plan.
 - ✅ **16. The spike's code when its plan is dropped.** Decided by D17: the code stays, and a revert is a slice of a new plan.
 - ✅ **17. A plan that `/plot-deliver` already panelled at delivery.** Decided by D18: the fleet verifies it again in Testing.
-- ✅ **18. Which Jira tickets the Discovery lanes show.** Decided by D20: every ticket of the declared projects, not only the current user's. Point 7 carries the consequence for the Delivery inbox.
+- ✅ **18. Which Jira tickets the Discovery lanes show.** Decided by D20: every ticket of the declared projects, not only the current user's. D21 and D22 settle the Delivery inbox's filter.
 
 ## Decisions
 
@@ -92,7 +92,9 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 | 2026-10-12 | D17. When a plan in Design is dropped after its spike merged, the spike's code stays. A revert is a slice of a new plan. | jwloka. D4 makes the spike real code, and a revert needs its own review. |
 | 2026-10-12 | D18. The fleet verifies every Delivered plan in Testing, including a plan that `/plot-deliver` already panelled at delivery. | jwloka. D11 reads "each Delivered plan" as written. |
 | 2026-10-12 | D19. The ticket index holds open tickets and the tickets closed in the last 14 days. The Discovery tab's released/archived toggle reads every closed ticket from the host on demand, capped at 1000. | jwloka. Bounds the index file, the pass and the payload. Answers Open Point 8. |
-| 2026-10-12 | D20. The Discovery lanes show the Jira tickets of the whole project, not only the current user's. D9's default for the Delivery tab then becomes a filter on the ticket's assignee, which needs Open Point 7. | jwloka. |
+| 2026-10-12 | D20. The Discovery lanes show the Jira tickets of the whole project, not only the current user's. D9's default for the Delivery tab then becomes a filter on the ticket's assignee, which D21 matches. | jwloka. |
+| 2026-10-12 | D21. A ticket's assignee is matched to the reader through the existing `People` key, extended with a tracker account per person as one more spelling, for example `jwloka = Jan Wloka, jira:jan.wloka@quatico.com`. Every existing `login = Name` entry stays valid. The reader is the host login. | jwloka. One place for identity. Answers Open Point 7. |
+| 2026-10-12 | D22. When the reader's account cannot be matched, *Waiting on you* shows every ticket, as today, and a sentence that names the missing match. | jwloka. Nothing is hidden silently. |
 
 ## Excluded from Scope
 
@@ -119,6 +121,6 @@ jwloka designed the change in one brainstorming session and took decisions D1 to
 
 ### 2026-10-12 — Panel round 1 and decisions D13 to D20
 
-Panel round 1 questioned four plans, `the-phases-are-declared`, `design-work-proves-the-path`, `tickets-and-stories-have-lanes` and `the-fleet-verifies-what-it-delivered`, and each panel answered `amend` unanimously. The four plans were revised. jwloka then took decisions D13 to D20 on the operator decisions the revisions listed, and the story, the spec and all six plans were aligned with them.
+Panel round 1 questioned four plans, `the-phases-are-declared`, `design-work-proves-the-path`, `tickets-and-stories-have-lanes` and `the-fleet-verifies-what-it-delivered`, and each panel answered `amend` unanimously. The four plans were revised. jwloka then took decisions D13 to D20 on the operator decisions the revisions listed, and D21 and D22 on the assignee match, and the story, the spec and all six plans were aligned with them.
 
 ---
