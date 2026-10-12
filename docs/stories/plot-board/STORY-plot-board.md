@@ -3,7 +3,7 @@ title: Making parallel work visible
 author: jwloka
 status: active
 created: 2026-08-15
-updated: 2026-09-04
+updated: 2026-10-12
 ---
 
 # Making parallel work visible
@@ -66,14 +66,14 @@ that closes the loop, and it has not been built yet.
 
 - ✅ `parallel-agent-fleet` — waves, claim-by-ref, worktree dispatch, merge queue, reaper (#72, #75, #76, #77, #78) — 2026-08-14
 
-### Phase 3: Parallel work becomes visible 🔄
+### Phase 3: Parallel work becomes visible ✅
 
-- 🔄 `fleet-agent-view` — the agent tab, in four steps; approved and started 2026-08-15
-  - 🔄 Step 1 `feature/fleet-scan-json` → `feature/fleet-api` → `feature/fleet-tab` — git-only agent list, three waves
-  - ⏸️ Step 2 — PR/CI data, completing *waiting on a machine*
-  - ⏸️ Step 3 — five board columns, leadership colour, Approved split
-  - ⏸️ Step 4 — story swimlanes
-- 🔄 `bb-state-vocabulary` — the board's PR data reaches Bitbucket repos at all; drafted 2026-08-18
+- ✅ `fleet-agent-view` — the agent tab, in four steps; approved and started 2026-08-15
+  - ✅ Step 1 `feature/fleet-scan-json` → `feature/fleet-api` → `feature/fleet-tab` — git-only agent list, three waves (#102, #103, #104). [fleet-agent-view](../../plans/2026-08-15-fleet-agent-view.md), Released 2026-08-15, v2.2.0
+  - ✅ Step 2 — PR/CI data, completing *waiting on a machine*
+  - ✅ Step 3 — five board columns, leadership colour, Approved split
+  - ✅ Step 4 — story swimlanes. Steps 2 to 4: [agent-view-completion](../../plans/2026-08-15-agent-view-completion.md), Released 2026-08-16, v2.3.0
+- ✅ `bb-state-vocabulary` — the board's PR data reaches Bitbucket repos at all; drafted 2026-08-18. [bb-state-vocabulary](../../plans/2026-08-18-bb-state-vocabulary.md), Released 2026-08-18, v2.5.1
 
 ## Open Points
 
@@ -1041,9 +1041,18 @@ from the same field.
 | `kanban-board-v1` | [#40](https://github.com/plot-pm/plot/pull/40) | ✅ Delivered 2026-08-15 | Merged 2026-07-13; delivered five weeks later. Shipped as 0.3.0, not the planned 1.0.0-rc.1 |
 | ↳ `kanban-board-v1-open-questions` | — | 📋 Decision log | Output of `/challenge-the-plan`; five questions Max decided 2026-07-12. Not a plan — kept as the record behind Q1's deferred `1.0.0-rc.1` |
 | `parallel-agent-fleet` | #72, #75, #76, #77, #78 | ✅ Delivered 2026-08-14 | Five stages; three adversarial audits, four defects found by execution |
-| `fleet-agent-view` | [#97](https://github.com/plot-pm/plot/pull/97) (plan) | 🔄 In progress | Started 2026-08-15 on `feature/fleet-scan-json`; brief in `.plot/briefs/`. Step 1 of four |
+| `fleet-agent-view` | [#97](https://github.com/plot-pm/plot/pull/97) (plan), #102, #103, #104 | ✅ Released 2026-08-15, v2.2.0 | Step 1 of four |
+| `agent-view-completion` | — | ✅ Released 2026-08-16, v2.3.0 | Steps 2 to 4 of the agent view |
 
 ## Session Log
+
+- **2026-10-12** — the estate on `main` shows 103 plans that name this
+  story: 99 Released, 3 Superseded and 1 Rejected. None is Draft, Approved or
+  Delivered. The last releases are three plans in v2.19.0 on 2026-09-20. Phase
+  3 is Released: `fleet-agent-view` in v2.2.0, `agent-view-completion` in
+  v2.3.0 and `bb-state-vocabulary` in v2.5.1. `agent-view-phase`, which the
+  open point on Draft plans tracks, is Released in v2.5.0. The `⏸️` open points
+  are not re-read against these plans.
 
 - **2026-08-30** — the 14 legacy `plot-wt-*` worktrees are gone, and clearing
   them found work that had been lost. `plot-reap.sh` removed 8 on merged PRs and

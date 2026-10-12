@@ -3,7 +3,7 @@ title: What a plan costs, and what the approval was worth
 author: jwloka
 status: active
 created: 2026-08-27
-updated: 2026-09-15
+updated: 2026-10-12
 ---
 
 # What a plan costs, and what the approval was worth
@@ -154,15 +154,18 @@ Sprint [[2026-W41-a-declared-agent-costs-what-it-costs]] carries this work.
 
 ---
 
-No plans yet — `draft` until the first is interrogated. This story is
-downstream of [[plot-agent-identity]] for per-role attribution, but neither
-half below is blocked on it.
+Three plans name this story, and all three are Released in v2.18.0. This
+story is downstream of [[plot-agent-identity]] for per-role attribution, but
+no item below is blocked on it.
 
-- ⏸️ **A plan says what it cost** — derive from transcripts, per plan, in
+- ✅ **A plan says what it cost** — derive from transcripts, per plan, in
   tokens. Never stored, absent when unreadable, *incomplete* rather than smaller
   when any slice is missing. **Not blocked on roles**: `registry.ts:236` already
   joins a transcript by exact session id, and session → branch → slice → plan is
-  a chain Plot already has.
+  a chain Plot already has. Released 2026-09-16, v2.18.0, as
+  [a-slice-says-what-it-spent](../../plans/2026-09-15-a-slice-says-what-it-spent.md),
+  [a-plan-states-what-its-slices-cost](../../plans/2026-09-15-a-plan-states-what-its-slices-cost.md)
+  and [a-plan-shows-what-it-cost](../../plans/2026-09-15-a-plan-shows-what-it-cost.md).
 - ⏸️ **A branch says what it is for** — project the sprint goal and MoSCoW tier
   onto the plan and the board, **for the human**. Not into the worker prompt;
   see the settled point above.
@@ -374,3 +377,11 @@ the story inside manifesto Q8.
   [the master agent holds the fleet](../the-master-agent-holds-the-fleet/STORY-the-master-agent-holds-the-fleet.md#6-which-of-my-own-claims-have-i-actually-verified).
 
 ---
+
+### 2026-10-12 — The estate
+
+Three plans name this story: `a-slice-says-what-it-spent`,
+`a-plan-states-what-its-slices-cost` and `a-plan-shows-what-it-cost`. All three
+are Released in v2.18.0 on 2026-09-16, through sprint
+`2026-W41-a-declared-agent-costs-what-it-costs`, which is Closed. They close the
+first item of the Current Plan. The second and third items have no plan.

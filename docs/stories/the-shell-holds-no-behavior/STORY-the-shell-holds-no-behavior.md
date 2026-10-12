@@ -3,7 +3,7 @@ title: The shell holds no behavior
 author: jwloka
 status: active
 created: 2026-10-09
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # The shell holds no behavior
@@ -30,17 +30,17 @@ The fleet runs apart from the board. The supervisor, the registry and the agent 
 
 ### Phase 1: The gate and the first two launchers ✅
 
-- ✅ [`the-shell-sheds-its-decisions`](../../plans/2026-10-09-the-shell-sheds-its-decisions.md) (#1404, Delivered 2026-10-09). The decision gate is #1405, bundle evidence is #1414, `plot-reap.sh` became a launcher in #1432 and `plot-approve.sh` in #1446.
+- ✅ [`the-shell-sheds-its-decisions`](../../plans/2026-10-09-the-shell-sheds-its-decisions.md) (#1404, Released 2026-10-10, v2.25.0). The decision gate is #1405, bundle evidence is #1414, `plot-reap.sh` became a launcher in #1432 and `plot-approve.sh` in #1446.
 - ✅ The gate counts every row whose kind is not *launcher*, *paired* included, with target 0 (#1416).
 
 ### Phase 2: Measure the per-pass cost ✅
 
-- ✅ [`the-pass-is-measured`](../../plans/2026-10-08-one-agent-pass-costs-what-its.md) measured, on a 16-core machine at 1, 4 and 8 concurrent agents, what the launcher variant (bash + launcher + node + bundle) adds in CPU over today's bash-only call, against `plot-worker-loop.sh`'s `readPass` call sites (`plot-config.sh`, `plot-host.sh`, `plot-worker-state.sh` and the rest of the scripts a busy pass reaches) — a trace, not a grep count. `scripts/measure-pass.mjs` holds the measurement; `docs/shell-and-domain.md` §1 holds the table.
+- ✅ [`one-agent-pass-costs-what-its`](../../plans/2026-10-08-one-agent-pass-costs-what-its.md) (#1406, Released 2026-10-10, v2.25.0), branch `feature/the-pass-is-measured`, measured, on a 16-core machine at 1, 4 and 8 concurrent agents, what the launcher variant (bash + launcher + node + bundle) adds in CPU over today's bash-only call, against `plot-worker-loop.sh`'s `readPass` call sites (`plot-config.sh`, `plot-host.sh`, `plot-worker-state.sh` and the rest of the scripts a busy pass reaches) — a trace, not a grep count. `scripts/measure-pass.mjs` holds the measurement; `docs/shell-and-domain.md` §1 holds the table.
 - ✅ The measurement decided the route: launcher adds **1750 % CPU per pass at 8 agents**, three orders of magnitude over the fixed 5 % threshold — route 2, answering per-pass questions inside the fleet's own long-lived process. Recorded in the Decisions table below and in `docs/shell-and-domain.md` §1.
 
 ### Phase 3: The fleet runs without the board ✅
 
-- ✅ [`the-fleet-runs-without-the-board`](../../plans/2026-10-09-the-fleet-runs-without-the-board.md) (#1407, Delivered 2026-10-10). The fleet bundles import no board code (#1413), `@plot-pm/fleet` exists (#1421), the supervisor is `plot-fleetd` (#1428), the fleet owns the scan and the PR index (#1444) and its automatic writes (#1452), and the controllers are commands (#1457).
+- ✅ [`the-fleet-runs-without-the-board`](../../plans/2026-10-09-the-fleet-runs-without-the-board.md) (#1407, Released 2026-10-10, v2.25.0). The fleet bundles import no board code (#1413), `@plot-pm/fleet` exists (#1421), the supervisor is `plot-fleetd` (#1428), the fleet owns the scan and the PR index (#1444) and its automatic writes (#1452), and the controllers are commands (#1457).
 
 ### Phase 4: The readings move ⏸️
 
@@ -48,15 +48,15 @@ The fleet runs apart from the board. The supervisor, the registry and the agent 
 - ⏸️ `plot-host.sh` (1,742 code lines) waits for the connector split in `the-build-pipeline-is-its-own-connector`, because `host-shell.ts` shells to it.
 - ⏸️ `plot-dispatch.sh` (1,639 code lines) gets a plan of its own.
 
-### Phase 5: The gates become launchers 🔄
+### Phase 5: The gates become launchers ✅
 
-- 🔄 [`the-gates-are-launchers`](../../plans/2026-10-10-the-gates-are-launchers.md) (Draft, sprint `the-gates-and-the-review-findings`, Release 2.26.0). The five PreToolUse gates `plot-phase-gate.sh`, `plot-state-gate.sh`, `plot-brief-name-gate.sh`, `plot-bundle-commit-gate.sh` and `plot-controller-gate.sh` become launchers over domain rules, one slice per gate. The controller-gate slice also closes #1341 and #1449.
+- ✅ [`the-gates-are-launchers`](../../plans/2026-10-10-the-gates-are-launchers.md) (#1341, #1449, Released 2026-10-12, v2.26.0, sprint `the-gates-and-the-review-findings`). The five PreToolUse gates `plot-phase-gate.sh`, `plot-state-gate.sh`, `plot-brief-name-gate.sh`, `plot-bundle-commit-gate.sh` and `plot-controller-gate.sh` become launchers over domain rules, one slice per gate. The controller-gate slice also closes #1341 and #1449.
 - On `main` at `c9d63311d`, 2026-10-10, `skills/plot/scripts/README.md` lists 16 *decision*, 4 *orchestration*, 1 *paired* and 4 *launcher* rows. This phase removes 5 *decision* rows.
 
 ## Open Points
 
 - ✅ What does one agent pass cost with every per-pass script as a launcher? → Phase 2. 1750 % CPU overhead at 8 agents against the launcher variant — route 2.
-- ⏸️ Which board dependencies does the fleet have today, and which process hosts the supervisor after the split? → Phase 3.
+- ✅ Which board dependencies does the fleet have today, and which process hosts the supervisor after the split? → Phase 3. The fleet bundles import no board code (#1413), and `plot-fleetd` hosts the supervisor (#1428).
 - ⏸️ Order of the reading groups in Phase 4. Candidate rule: most callers first.
 
 ## Decisions
@@ -79,3 +79,8 @@ The fleet runs apart from the board. The supervisor, the registry and the agent 
 
 - Phase 1 and Phase 3 are delivered: the decision gate counts every non-launcher row, `plot-reap.sh` and `plot-approve.sh` are launchers, and the fleet runs as `@plot-pm/fleet` without the board.
 - jwloka chose the five PreToolUse gates as the next conversion, as the Must Have of sprint `the-gates-and-the-review-findings` for Release 2.26.0. A gate runs once per tool call and not once per agent pass, so the launcher cost rule in `docs/shell-and-domain.md` allows it.
+
+### 2026-10-12
+
+- The estate on `main` shows all four plans of this story Released: `the-shell-sheds-its-decisions`, `one-agent-pass-costs-what-its` and `the-fleet-runs-without-the-board` in v2.25.0, and `the-gates-are-launchers` in v2.26.0. Phase 4 has no plan yet.
+- The story is now listed in the `Stories` table of the repo's `README.md`.

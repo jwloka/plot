@@ -3,7 +3,7 @@ title: The master agent holds the fleet
 author: jwloka
 status: active
 created: 2026-08-28
-updated: 2026-09-04
+updated: 2026-10-12
 ---
 
 # The master agent holds the fleet
@@ -300,7 +300,9 @@ would make it a gate.
   excludes it because new capability during a migration leaves the corpus tests
   with nothing to compare against — production would hold no implementation of
   the new rule. It needs its own plan once the domain is the only
-  implementation.
+  implementation. That plan is
+  [a-pulse-says-what-changed](../../plans/2026-09-05-a-pulse-says-what-changed.md),
+  Released 2026-09-08, v2.14.0.
 - ~~Where does the harness live — more shell helpers, a board API, or a skill?~~
   **Answered 2026-08-30: it lives in `@plot-pm/domain`, and the shell scripts
   are its adapters.** None of the three options was right, because the question
@@ -323,7 +325,80 @@ would make it a gate.
   showed two (`implement`, `release`) have no script at all, which the "more
   shell helpers" option would have hidden rather than surfaced.
 
+## Plans
+
+| Plan | State |
+|------|-------|
+| [production-calls-the-domain-one-rule-at-a-time](../../plans/2026-08-28-production-calls-the-domain-one-rule-at-a-time.md) | Released 2026-09-05, v2.13.0 |
+| [the-domain-moves-out-of-the-board](../../plans/2026-08-28-the-domain-moves-out-of-the-board.md) | Released 2026-08-29, v2.12.0 |
+| [the-domain-runs-the-workflows-in-a-sandbox](../../plans/2026-08-28-the-domain-runs-the-workflows-in-a-sandbox.md) | Released 2026-09-05, v2.13.0 |
+| [the-board-shows-stories](../../plans/2026-08-29-the-board-shows-stories.md) | Released 2026-08-29, v2.12.0 |
+| [the-domain-speaks-slices](../../plans/2026-08-29-the-domain-speaks-slices.md) | Released 2026-09-05, v2.13.0 |
+| [a-machine-is-an-instance](../../plans/2026-08-30-a-machine-is-an-instance.md) | Released 2026-09-05, v2.13.0 |
+| [a-working-agent-is-not-a-hung-one](../../plans/2026-08-30-a-working-agent-is-not-a-hung-one.md) | Released 2026-09-05, v2.13.0 |
+| [monitoring-is-a-domain-concept](../../plans/2026-08-30-monitoring-is-a-domain-concept.md) | Released 2026-09-05, v2.13.0 |
+| [the-board-decides-nothing](../../plans/2026-08-30-the-board-decides-nothing.md) | Released 2026-09-05, v2.13.0 |
+| [the-controller-answers-every-asker](../../plans/2026-08-30-the-controller-answers-every-asker.md) | Released 2026-09-05, v2.13.0 |
+| [the-exclusion-names-what-it-hides](../../plans/2026-08-30-the-exclusion-names-what-it-hides.md) | Released 2026-09-05, v2.13.0 |
+| [the-pulse-is-an-entity](../../plans/2026-08-30-the-pulse-is-an-entity.md) | Released 2026-09-05, v2.13.0 |
+| [the-registry-owns-what-it-started](../../plans/2026-08-30-the-registry-owns-what-it-started.md) | Released 2026-09-05, v2.13.0 |
+| [the-sprint-proves-its-own-goal](../../plans/2026-08-30-the-sprint-proves-its-own-goal.md) | Released 2026-09-05, v2.13.0 |
+| [two-monitors-watch-the-agent](../../plans/2026-08-30-two-monitors-watch-the-agent.md) | Released 2026-09-05, v2.13.0 |
+| [a-browser-test-serves-its-own-state](../../plans/2026-08-31-a-browser-test-serves-its-own-state.md) | Released 2026-09-05, v2.13.0 |
+| [the-board-answers-while-it-scans](../../plans/2026-08-31-the-board-answers-while-it-scans.md) | Rejected 2026-08-31 |
+| [the-read-path-stops-spawning](../../plans/2026-08-31-the-read-path-stops-spawning.md) | Released 2026-09-05, v2.13.0 |
+| [the-registry-supervises-its-agents](../../plans/2026-08-31-the-registry-supervises-its-agents.md) | Released 2026-09-05, v2.13.0 |
+| [a-refused-dispatch-asks-for-a-brief](../../plans/2026-09-01-a-refused-dispatch-asks-for-a-brief.md) | Released 2026-09-05, v2.13.0 |
+| [a-slice-can-wait-on-another-plan](../../plans/2026-09-01-a-slice-can-wait-on-another-plan.md) | Released 2026-09-05, v2.13.0 |
+| [a-third-connector-costs-one-adapter](../../plans/2026-09-01-a-third-connector-costs-one-adapter.md) | Released 2026-09-05, v2.13.0 |
+| [an-idle-agent-is-not-a-stalled-one](../../plans/2026-09-01-an-idle-agent-is-not-a-stalled-one.md) | Released 2026-09-05, v2.13.0 |
+| [an-agent-holds-one-desk](../../plans/2026-09-02-an-agent-holds-one-desk.md) | Released 2026-09-05, v2.13.0 |
+| [quiet-is-not-one-state](../../plans/2026-09-03-quiet-is-not-one-state.md) | Released 2026-09-05, v2.13.0 |
+| [the-board-says-slice](../../plans/2026-09-03-the-board-says-slice.md) | Released 2026-09-05, v2.13.0 |
+| [the-domain-owns-the-agent-lifecycle](../../plans/2026-09-03-the-domain-owns-the-agent-lifecycle.md) | Released 2026-09-05, v2.13.0 |
+| [a-ref-is-not-a-claim](../../plans/2026-09-04-a-ref-is-not-a-claim.md) | Released 2026-09-05, v2.13.0 |
+| [a-merged-slice-leaves-the-queue](../../plans/2026-09-05-a-merged-slice-leaves-the-queue.md) | Released 2026-09-08, v2.14.0 |
+| [a-process-is-started-by-its-own-command](../../plans/2026-09-05-a-process-is-started-by-its-own-command.md) | Released 2026-09-08, v2.14.0 |
+| [a-pulse-says-what-changed](../../plans/2026-09-05-a-pulse-says-what-changed.md) | Released 2026-09-08, v2.14.0 |
+| [a-second-slice-needs-its-own-session](../../plans/2026-09-05-a-second-slice-needs-its-own-session.md) | Released 2026-09-08, v2.14.0 |
+| [the-plan-format-drops-what-nothing-uses](../../plans/2026-09-05-the-plan-format-drops-what-nothing-uses.md) | Rejected 2026-09-05 |
+| [the-slice-contract-says-what-it-reads](../../plans/2026-09-05-the-slice-contract-says-what-it-reads.md) | Released 2026-09-08, v2.14.0 |
+| [a-changeset-names-its-plan](../../plans/2026-09-06-a-changeset-names-its-plan.md) | Released 2026-09-08, v2.14.0 |
+| [a-desk-is-adopted-and-swept](../../plans/2026-09-06-a-desk-is-adopted-and-swept.md) | Released 2026-09-08, v2.14.0 |
+| [a-dispatch-action-asks-for-its-brief](../../plans/2026-09-06-a-dispatch-action-asks-for-its-brief.md) | Released 2026-09-08, v2.14.0 |
+| [a-merged-slice-has-no-ref-to-count](../../plans/2026-09-06-a-merged-slice-has-no-ref-to-count.md) | Released 2026-09-08, v2.14.0 |
+| [a-plan-greps-for-its-own-deliverable](../../plans/2026-09-06-a-plan-greps-for-its-own-deliverable.md) | Released 2026-09-08, v2.14.0 |
+| [a-sprint-knows-when-it-ended](../../plans/2026-09-06-a-sprint-knows-when-it-ended.md) | Released 2026-09-08, v2.14.0 |
+| [a-stale-plan-file-does-not-travel](../../plans/2026-09-06-a-stale-plan-file-does-not-travel.md) | Released 2026-09-08, v2.14.0 |
+| [a-stated-state-is-one-the-domain-admits](../../plans/2026-09-06-a-stated-state-is-one-the-domain-admits.md) | Released 2026-09-08, v2.14.0 |
+| [a-stated-wait-is-a-parsed-wait](../../plans/2026-09-06-a-stated-wait-is-a-parsed-wait.md) | Released 2026-09-08, v2.14.0 |
+| [a-story-says-what-it-is](../../plans/2026-09-06-a-story-says-what-it-is.md) | Released 2026-09-08, v2.14.0 |
+| [the-brief-command-invokes-a-skill](../../plans/2026-09-06-the-brief-command-invokes-a-skill.md) | Released 2026-09-08, v2.14.0 |
+| [the-last-two-callers-ask-the-adapter](../../plans/2026-09-06-the-last-two-callers-ask-the-adapter.md) | Released 2026-09-08, v2.14.0 |
+| [the-supervisor-says-why-it-handed-nothing](../../plans/2026-09-06-the-supervisor-says-why-it-handed-nothing.md) | Released 2026-09-08, v2.14.0 |
+| [a-browser-stub-beats-the-first-fetch](../../plans/2026-09-07-a-browser-stub-beats-the-first-fetch.md) | Released 2026-09-08, v2.14.0 |
+| [a-dispatch-stop-finds-the-desk](../../plans/2026-09-07-a-dispatch-stop-finds-the-desk.md) | Released 2026-09-08, v2.15.0 |
+| [a-merged-ref-is-reported-too](../../plans/2026-09-07-a-merged-ref-is-reported-too.md) | Released 2026-09-08, v2.15.0 |
+| [an-agent-learns-its-pr-failed](../../plans/2026-09-07-an-agent-learns-its-pr-failed.md) | Released 2026-09-08, v2.15.0 |
+| [orphaned-work-is-visible](../../plans/2026-09-07-orphaned-work-is-visible.md) | Released 2026-09-08, v2.14.0 |
+| [the-board-says-what-it-could-not-ask](../../plans/2026-09-07-the-board-says-what-it-could-not-ask.md) | Released 2026-09-08, v2.15.0 |
+| [the-board-says-whether-anything-supervises](../../plans/2026-09-07-the-board-says-whether-anything-supervises.md) | Released 2026-09-08, v2.14.0 |
+| [the-bundle-set-is-derived-once](../../plans/2026-09-07-the-bundle-set-is-derived-once.md) | Released 2026-09-08, v2.14.0 |
+| [the-installed-supervisor-hands-work-over](../../plans/2026-09-07-the-installed-supervisor-hands-work-over.md) | Released 2026-09-08, v2.14.0 |
+| [a-sprint-transition-is-performed](../../plans/2026-09-08-a-sprint-transition-is-performed.md) | Released 2026-09-11, v2.16.0 |
+| [the-registry-sweeps-what-it-did-not-start](../../plans/2026-09-08-the-registry-sweeps-what-it-did-not-start.md) | Released 2026-09-11, v2.16.0 |
+| [one-cap-holds-across-boards](../../plans/2026-09-11-one-cap-holds-across-boards.md) | Released 2026-09-14, v2.17.0 |
+| [auto-dispatch-asks-for-the-brief](../../plans/2026-09-12-auto-dispatch-asks-for-the-brief.md) | Released 2026-09-14, v2.17.0 |
+| [the-supervisor-log-has-a-ceiling](../../plans/2026-09-15-the-supervisor-log-has-a-ceiling.md) | Released 2026-09-16, v2.18.0 |
+| [a-rule-reaches-the-install-that-runs-it](../../plans/2026-09-17-a-rule-reaches-the-install-that-runs-it.md) | Released 2026-09-20, v2.19.0 |
+
 ## Session Log
+
+- **2026-10-12** — the estate on `main` shows 62 plans that name this story:
+  60 Released and 2 Rejected. None is Draft, Approved or Delivered. The last
+  release is `a-rule-reaches-the-install-that-runs-it` in v2.19.0 on
+  2026-09-20. The delta of job 3 is Released as `a-pulse-says-what-changed` in
+  v2.14.0. The Plans table above lists all 62.
 
 - **2026-08-30** — two plans written from failures this story predicted.
   `the-controller-answers-every-asker` answers the driving side the ports left
