@@ -46,6 +46,8 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 
 **The board.** The *Commission design* button, `CommissionDesignButton.tsx` and `POST /api/commission` are removed. A spec run renders as a Delivery tab row in *Working*, and a failed one in *Waiting on you*.
 
+**The controller prose.** `CLAUDE.md:499` names `commission` twice: in the list of controller endpoints and in the routes that are still HTTP only. The slice removes both names, and `./scripts/check-agents-md.sh --write` regenerates `AGENTS.md`. After `feature/a-draft-can-need-design` of `the-phases-are-declared` the endpoint list carries no count word, so the removal changes one name; if this slice lands first, it also changes the count from nine to eight.
+
 **What stays human.** The fleet moves no plan into Design, approves no spike, merges no spec and approves no plan (D3, D10).
 
 ### Open Points
@@ -62,7 +64,7 @@ The design spec is [DESIGN-phases.md](../stories/plot-works-in-five-phases/DESIG
 
 ### The fleet acts
 
-- `feature/the-fleet-commissions-the-spec` — `plot-fleetd` starts a spec agent for a `write-spec` plan; the spec prompt; one run per plan in the fleet's state; the spec PR; the Delivery tab rows; *Commission design* and `/api/commission` are removed <!-- builds: the fleet's spec agent and its one-run record -->
+- `feature/the-fleet-commissions-the-spec` — `plot-fleetd` starts a spec agent for a `write-spec` plan; the spec prompt; one run per plan in the fleet's state; the spec PR; the Delivery tab rows; *Commission design* and `/api/commission` are removed; `commission` leaves both lists at `CLAUDE.md:499`, and `AGENTS.md` follows <!-- builds: the fleet's spec agent and its one-run record -->
 - `feature/the-fleet-dispatches-an-approved-spike` — `planAutoDispatch` and `startableBranches` accept the spike slice of a Design plan when `designWork` answers `dispatch-spike` <!-- builds: automatic dispatch of an approved spike -->
 
 ## Notes

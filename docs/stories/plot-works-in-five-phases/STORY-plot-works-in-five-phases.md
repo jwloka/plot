@@ -60,10 +60,10 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 - ✅ **8. How many closed tickets the index holds.** Decided by D19: open tickets plus closed tickets of the last 14 days; the Discovery tab's archived toggle reads every closed ticket from the host on demand, capped at 1000. D24 draws the 20 most recently closed in the Done lane.
 - ⏸️ **9. Where the fleet's spec commit goes.** The plan default in `the-fleet-writes-the-design`: onto the plan PR's head branch when one is open, otherwise onto a new `idea/<slug>-spec` branch with a PR that a person merges.
 - ⏸️ **10. The command a spec agent runs.** *Commission design* reuses the `Idea command` key today (`packages/fleet/src/shared/implement-run.ts:29`). The plan default keeps it; a `Design command` key is the alternative.
-- ⏸️ **11. The checklist's file name before a version exists.** D11 builds on `docs/releases/v<version>-checklist.md`, which `/plot-release rc` names after it chooses the version. The plan default in `the-fleet-verifies-what-it-delivered`: the fleet writes `docs/releases/vnext-checklist.md`, which sorts after every `v<digit>` name so the Testing badge (`board.ts:423`) reads it, and `/plot-release rc` renames it.
+- ⏸️ **11. The checklist's file name before a version exists.** D11 builds on `docs/releases/v<version>-checklist.md`, which `/plot-release rc` names after it chooses the version. The plan default in `the-fleet-verifies-what-it-delivered`: the fleet writes `docs/releases/vnext-checklist.md`, which sorts after every `v<digit>` name so the Testing badge (`board.ts:423`) reads it. `/plot-release rc` adds its RC line to `vnext-checklist.md` in place and keeps the name, the fleet leaves a file with an `RC:` line alone, and the final `/plot-release` renames it to `v<version>-checklist.md`.
 - ⏸️ **12. More than one Active sprint.** `SprintStateSchema` admits several `Active` sprints. The plan default for the *Active sprint* toggle: the union of every Active sprint.
 - ⏸️ **13. A manual trigger for a spec run.** D10 has the fleet run today's *Commission design*. The plan default in `the-fleet-writes-the-design` removes the board button, because *Needs design* and the fleet cover its two halves. A *Write the spec now* button is the alternative.
-- ⏸️ **14. Which plans the first verification run covers.** D11 covers each Delivered plan. The plan default in `the-fleet-verifies-what-it-delivered`: Delivered plans from the day the run lands; Released plans are not run.
+- ⏸️ **14. Which plans the first verification run covers.** D11 covers each Delivered plan. The plan default in `the-fleet-verifies-what-it-delivered`: every plan that reads `State: Delivered` while `Auto-verify` is on, selected by state, not by date; Released plans and tracer plans are not run.
 - ✅ **15. The spike's changeset in a release cut while its plan is in Design.** Decided by D16: the changeset ships, and the release cross-check lists it as a spike of a Design plan.
 - ✅ **16. The spike's code when its plan is dropped.** Decided by D17: the code stays, and a revert is a slice of a new plan.
 - ✅ **17. A plan that `/plot-deliver` already panelled at delivery.** Decided by D18: the fleet verifies it again in Testing.
@@ -128,5 +128,9 @@ Panel round 1 questioned four plans, `the-phases-are-declared`, `design-work-pro
 ### 2026-10-12 — Panel round 2 and decisions D23 and D24
 
 Panel round 2 questioned `tickets-and-stories-have-lanes` and answered `amend` unanimously. jwloka took D23 (the Jira inbox keeps `assignee = currentUser()` until `People` matches the reader) and D24 (a 20-row Done lane). The plan, this story and `DESIGN-phases.md` §5 were revised; the plan lists the changes `the-board-has-three-tabs` needs.
+
+### 2026-10-12 — Round-2 revisions and cross-plan alignment
+
+Round-2 revisions and cross-plan alignment. The changes that the round-2 revisions of `the-phases-are-declared`, `design-work-proves-the-path`, `tickets-and-stories-have-lanes` and `the-fleet-verifies-what-it-delivered` listed for other files were applied to `DESIGN-phases.md` §4, §5, §6 and §8, to Open Points 11 and 14, and to the six plans. No decision, slice branch or `Rounds:` value changed.
 
 ---
