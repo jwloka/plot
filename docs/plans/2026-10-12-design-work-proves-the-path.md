@@ -176,7 +176,7 @@ The removal is measured: 46 counted lines by the ratchet's own regex (`check-she
 
 ### Dispatching the spike
 
-- `feature/the-spike-can-be-dispatched` — `sliceVerdicts` admits the approved spike from the two verdict columns; `plangate` and `spike-only`; `implement` writes the spike's brief; `phaseGateRefusal`; one test per place with a spike and a non-spike branch of one Design plan; a reconcile test that a merged spike of a Design plan is no drift; `test/e2e/spike-dispatch.test.mjs` <!-- builds: spike eligibility in sliceVerdict and the four dispatch gates -->
+- `feature/the-spike-can-be-dispatched` — `sliceVerdicts` admits the approved spike from the two verdict columns; `plangate` and `spike-only`; `implement` writes the spike's brief; `phaseGateRefusal`; one test per place with a spike and a non-spike branch of one Design plan; a reconcile test that a merged spike of a Design plan is no drift; `test/e2e/spike-dispatch.test.mjs` → #1634 <!-- builds: spike eligibility in sliceVerdict and the four dispatch gates -->
 
 ### Confirming the slices
 
