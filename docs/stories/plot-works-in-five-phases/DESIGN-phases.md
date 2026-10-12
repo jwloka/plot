@@ -13,7 +13,7 @@ The phases of a team's workflow are configuration. Plot knows plan states, story
 
 > **Story:** [Plot works in five phases](STORY-plot-works-in-five-phases.md)
 >
-> **Decisions:** every decision in this spec is one of the twenty-seven that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D27). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
+> **Decisions:** every decision in this spec is one of the thirty that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D30). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
 
 ## Contents
 
@@ -152,6 +152,8 @@ A plan in Design names one slice as its spike (D4), with an annotation on the br
 
 The spike is the sole branch under the first slice heading. Approving the spike refuses `spike-not-first` otherwise, so every later slice reads `unapproved` until the plan is approved.
 
+**Landing order.** `design-work-proves-the-path` builds this machinery spike-first. Its own spike, `feature/the-design-approvals-are-gated`, lands the person arm and the state gate fix of #1611 first. The `Spike approved:` record and the gate that holds it land later, with the spike approval slice `feature/the-spike-is-approved-alone`. Until the machinery ships, a spike-first plan is approved whole, and a `.plot/hold` line is written for each of its branches except the spike right after the approval, because the approval clears the plan's holds (D29). A person removes the holds once the spike's Acceptance holds in CI. No command writes a `.plot/hold` line today.
+
 ```mermaid
 stateDiagram-v2
     direction LR
@@ -173,8 +175,8 @@ stateDiagram-v2
 
 - **A person approves the spike alone.** The approval is the `--spike` mode of the approve controller, `board/plot-approve.mjs --spike <slug> --who <handle>` or `POST /api/approve` with `"spike": true`, under the `approve` action, so no new controller action exists. It needs a named person from `People` on every review channel. It writes a `Spike approved:` record (`<date>, <who>, <channel>`) and leaves `State: Design`. For a `Review: pr` plan it merges the plan PR, so the plan with `State: Design` and the record reaches the default branch, where the fleet reads it (D13). The spike slice becomes dispatchable. Every other slice of the plan stays undispatchable.
 - **A gate holds the record.** The state gate extends from the `State:` line to the `Spike approved:` record, and refuses a commit that adds, changes or removes the record without the receipt the spike approval leaves. The receipt is keyed `<plan path>#Spike approved`, so a `State:` receipt never admits the record and the record's receipt never admits a `State:` change.
-- **The fleet dispatches the spike like any slice** (D4, D10). Its PR is real code, and it lands on the default branch. Five places refuse a slice of a plan that is not `approved` today, and each admits the approved spike and nothing else of the plan: `sliceVerdict`, the dispatch workflow's `plangate`, `plot-dispatch.sh`, the brief route of `implement`, and the commit-time `phaseGateRefusal`.
-- **The plan stays in Design after the merge.** A person then confirms the remaining slices, or rewrites them, and approves the plan. The second approval is a person's act on every review channel: a plan in `State: Design` approves through the person arm, with `--who` from `People`, even when its `Review:` field reads `pr` and its plan PR has merged (D10, D13). The arm keys on the `design` state, which the state gate holds, not on the `Spike approved:` record; a `Review: ballot` plan keeps its tally. The approval writes the usual `Approved:` record and no second record, and the plan moves to Development.
+- **The fleet dispatches the spike like any slice** (D4, D10). Its PR is real code, and it lands on the default branch. Five places refuse a slice of a plan that is not `approved` today: `sliceVerdict`, the dispatch workflow's `plangate`, the shell `case` in `plot-dispatch.sh`, the brief route of `implement`, and the commit-time `phaseGateRefusal`. `feature/a-slice-is-marked-spike` deletes the shell `case`, and `plot-dispatch.sh` then asks `plangate`. So four places in TypeScript admit the approved spike and nothing else of the plan, and `plot-dispatch.sh` follows `plangate`.
+- **The plan stays in Design after the merge.** A person then confirms the remaining slices, or rewrites them, and approves the plan. The second approval is a person's act on every review channel: a plan in `State: Design` approves through the person arm, with `--who` from `People`, even when its `Review:` field reads `pr` and its plan PR has merged (D10, D13). The arm keys on the `design` state, not on the `Spike approved:` record. The state gate holds that state once the spike of `design-work-proves-the-path` fixes #1611 and the same-slug rename; a `Review: ballot` plan keeps its tally. The approval writes the usual `Approved:` record and no second record, and the plan moves to Development.
 - **Approval refuses a plan whose spike has not merged.** The reading is the host's `mergedAt` for the spike's PR. The refusal names the two ways forward: wait for the spike's merge, or remove the `spike` annotation.
 - **A release cut while the plan is in Design** ships the spike's changeset, and the release cross-check lists it as a spike of a Design plan (D16).
 - **A plan dropped after its spike merged** keeps the spike's code on the default branch. A revert is a slice of a new plan (D17).
@@ -241,7 +243,7 @@ The issue index keeps the tickets closed in the last 14 days (D19). The Done lan
 - **The PR pass** holds its own gate until `backoffUntil` where the issue pass spent its own connector and account, and never moves its gate earlier. It subtracts the issue pass's spend from the rate its cadence divides by under the same condition, and the spend banner keeps the account's whole rate. A Jira source spends the Jira account, so the PR pass neither subtracts it nor shares its backoff.
 - **The board** reads the gate to pace the archived toggle's closed read and to hold it during a backoff. With no fleet, the board keeps the same fields in memory and writes no file.
 
-**Scope (D20, D23).** On Jira the lanes show every ticket of the declared projects, not only the current user's: the lanes' open and closed reads drop the `assignee = currentUser()` clause that the Jira inbox reads today (`plot-host.sh:4684`). The project-wide read needs `Ticket prefixes`: with none declared, the open read keeps today's query and the lanes show the reader's own tickets, because an unscoped read without the person clause covers the whole Jira instance. The inbox keeps today's read beside the lanes read (D23, *Delivery* below). The drop lands only after the Delivery tab's assignee filter exists.
+**Scope (D20, D23, D30).** On Jira the lanes show every ticket of the declared projects, not only the current user's: the lanes' open and closed reads drop the `assignee = currentUser()` clause that the Jira inbox reads today (`plot-host.sh:4684`). The project-wide read needs `Ticket prefixes`: with none declared, the open read keeps today's query and the lanes show the reader's own tickets, because an unscoped read without the person clause covers the whole Jira instance. The inbox keeps today's read beside the lanes read (D23, *Delivery* below). The drop lands only after the Delivery tab's assignee filter exists. The inbox read rides the issue pass, on the same gate (D30): its page counts in the pass's requests, so the Jira spend stays at most 30 requests an hour, and on a project with 1000 open tickets the pass, and the inbox with it, runs about every 22 minutes.
 
 ### Planning
 
@@ -271,7 +273,7 @@ The fleet reads plan states and markers. It never reads a phase name (D12).
 
 For each Delivered plan the fleet runs a verification panel against the merged work on the default branch (D11). This includes a plan that `/plot-deliver` step 5 already panelled at delivery, which the fleet verifies again (D18). A tracer plan (`Tracer: yes`) never reads in Testing (§3), so the fleet starts no run for it, and the claims it carries are judged where its first dependent's Changelog states them.
 
-1. **The pinned commit.** A run judges the plan at its delivery commit, the commit on the default branch that added the `Delivered:` record, in a detached worktree. A later plan cannot refute an earlier claim. The record names the commit.
+1. **The pinned commit.** A run judges the plan at its delivery commit, the commit on the default branch that added the `Delivered:` record, in a detached worktree. The pin narrows the window in which a later plan can refute a claim, and does not close it: a plan delivered later can merge a slice before the pin. The run executes the default branch's scripts, bundles and skill text against the pinned code, and reads only the plan, its code and its `## Plot Config` at the pinned commit. The record names the delivery commit, the judged commit and the tools commit.
 2. **The claims.** Each Changelog entry and acceptance claim of the plan is one claim. The run is `/plot-deliver --verify <slug>`, which uses step 5's lenses, rubric and the vocabulary `supported` and `refuted` through the `plot-panel` mechanism. Each juror commits one gated label per claim, shown to the juror as `Claim-<n>: <supported|refuted>`, beside step 5's `Position` and `Evidence` lines. A line pasted from that form fails the gate, because `<supported|refuted>` is not a word in the vocabulary. `/plot-panel`'s Commitment parameter becomes a list of labels: it checks each label per juror and sends a juror back once with every refusal of that juror, so a juror that omits a label is asked again for it. A juror still refused after the send-back makes the run fail. A domain fold gives one line per claim, and one refutation decides.
 3. **The record.** The fleet writes a `Verified:` line in `## Status` and a `## Verification` section with one line per claim. The record names the delivery it judged, by its `Delivered:` date and commit. `/plot-reject` replaces `Delivered:` with `Rejected:` and keeps the record, so the record reads `stale` when the plan's current `Delivered:` value differs from it or is absent, and the fleet verifies a `stale` plan again after its next delivery.
 4. **The issues.** The fleet opens one issue per refuted claim, labelled `ai-generated`, through the tracker port. This is a new write to a tracker, which D11 decides. The port resolves through the issue source (`trackerForIssues`), and the git host's issue connector is read-only, so a repository with no `Tracker` key answers `unaskable` and opens nothing. This repository declares no `Tracker` key, so its own runs open no issue, and the claim's line says so.
@@ -288,6 +290,7 @@ Release stays a person's act (D11). The fleet fills no sign-off line, which `/pl
 |---|---|---|
 | Deciding that a plan needs design | a person, at `/plot-idea` or with *Needs design* | D3 |
 | Approving a spike | a person | D4 |
+| Removing the holds of a spike-first plan approved whole | a person | D29 |
 | Confirming the slices after a spike and approving the plan | a person | D4, D10 |
 | Approving any plan | a person | D10 |
 | Delivering a tracer plan with no dependent | a person | D14 |
@@ -318,7 +321,7 @@ Every view state in this story is a domain property, per CLAUDE.md's *Every rend
 | `ticketLane(issue, reading, now)`, `storyLanes(map)`, `storyLane(map, standing, location)` | new | `tickets-and-stories-have-lanes` |
 | `trackerForIssues(declared, gitHost, context)` | new adapter resolver | `tickets-and-stories-have-lanes` |
 | `specIsEmpty(planText)`, `designWork(plan)` | new | `the-fleet-writes-the-design` |
-| `claimsOf(plan)`, `verificationOf(plan)`, `refutedClaims(record)`, `foldVerification(claims, jurors)`, `verifyStart(readings)`, `verificationRow(plan, runState)` | new | `the-fleet-verifies-what-it-delivered` |
+| `claimsOf(plan)`, the refs operation `recordCommit(file, field)`, `verificationOf(plan, deliveryCommit)`, `refutedClaims(record)`, `foldVerification(claims, jurors)`, `verifyStart(readings)`, `verificationRow(plan, runState)` | new | `the-fleet-verifies-what-it-delivered` |
 
 ## 9. Out of scope
 

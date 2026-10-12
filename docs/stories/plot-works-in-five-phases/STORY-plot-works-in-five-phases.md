@@ -20,17 +20,17 @@ The design spec is [DESIGN-phases.md](DESIGN-phases.md).
 
 ## Decisions Taken in Scoping
 
-Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`. Decisions D25 to D27 were taken on 2026-10-12 and answer Open Points 1 to 3. D28 was taken on 2026-10-12 after panel round 3 of `tickets-and-stories-have-lanes`.
+Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`. Decisions D25 to D27 were taken on 2026-10-12 and answer Open Points 1 to 3. D28 was taken on 2026-10-12 after panel round 3 of `tickets-and-stories-have-lanes`. D29 and D30 were taken on 2026-10-12 after the spike-first revisions of three plans.
 
 ## Current Plan
 
 ### Phase 1: The phases are declared ⏸️
 
-- ⏸️ [`the-phases-are-declared`](../../plans/2026-10-12-the-phases-are-declared.md) — the `Workflow phases` key, the shipped default, a domain rule over the declared map in place of `toBoardPhase` and `storyPhase`, the board's columns and auto-bump against the map, `/plot-idea`'s design question, the *Needs design* action, and the phase prose. Unblocks every other plan.
+- ⏸️ [`the-phases-are-declared`](../../plans/2026-10-12-the-phases-are-declared.md) — the `Workflow phases` key, the shipped default, a domain rule over the declared map in place of `toBoardPhase` and `storyPhase`, the board's columns and auto-bump against the map, `/plot-idea`'s design question, the *Needs design* action, and the phase prose. Slices of Phases 2, 3 and 6 wait on it, and Phase 4's lanes slice waits on it through Phase 3. Its *Needs design* slice waits on Phase 2's spike `feature/the-design-approvals-are-gated`, so no plan reaches `State: Design` through *Needs design* before the person arm exists.
 
 ### Phase 2: Design work proves the path ⏸️
 
-- ⏸️ [`design-work-proves-the-path`](../../plans/2026-10-12-design-work-proves-the-path.md) — the spike marker, approving the spike alone, confirming the slices after the spike, and tracer-bullet plans. Waits on Phase 1.
+- ⏸️ [`design-work-proves-the-path`](../../plans/2026-10-12-design-work-proves-the-path.md) — the spike marker, approving the spike alone, confirming the slices after the spike, and tracer-bullet plans. Spike-first: its first slice, `feature/the-design-approvals-are-gated`, builds the person arm and the state gate fix of #1611 and waits on nothing. The plan is approved whole, and its six other branches are held in `.plot/hold` until the spike's Acceptance holds in CI (D29). Its tracer status slice waits on Phase 1.
 
 ### Phase 3: The board has three tabs ⏸️
 
@@ -38,7 +38,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 
 ### Phase 4: Tickets and stories have lanes ⏸️
 
-- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — a spike that builds the issue gate and its spend sharing with the PR pass (D28), closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and archived toggle, and the project-wide Jira read (D20, D23). Waits on Phase 3; the Jira slice waits on Phase 3's assignee filter.
+- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — a spike that builds the issue gate and its spend sharing with the PR pass (D28), closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and archived toggle, and the project-wide Jira read (D20, D23, D30). Spike-first: the spike `feature/the-fleet-indexes-issues` waits on nothing. The plan is approved whole, and its five other branches are held in `.plot/hold` until the spike's Acceptance holds in CI (D29). The lanes slice waits on Phase 3's tab slice, and the Jira slice waits on Phase 3's assignee filter.
 
 ### Phase 5: The fleet writes the design ⏸️
 
@@ -46,7 +46,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 
 ### Phase 6: The fleet verifies what it delivered ⏸️
 
-- ⏸️ [`the-fleet-verifies-what-it-delivered`](../../plans/2026-10-12-the-fleet-verifies-what-it-delivered.md) — a verification panel per Delivered plan, a verification record, an issue per refuted claim, and a manual release checklist. Waits on Phase 1; its issue-write slice waits on Phase 4's `feature/the-tracker-lists-closed-issues`.
+- ⏸️ [`the-fleet-verifies-what-it-delivered`](../../plans/2026-10-12-the-fleet-verifies-what-it-delivered.md) — a verification panel per Delivered plan, a verification record, an issue per refuted claim, and a manual release checklist. Spike-first: the spike `feature/a-pinned-run-verifies-one-plan` waits on nothing. The plan is approved whole, and its six other branches are held in `.plot/hold` until the spike's Acceptance holds in CI (D29). Its record slice waits on Phase 1's `feature/the-board-draws-the-declared-phases` and Phase 2's `feature/a-slice-is-marked-spike`, its run slice waits on Phase 2's `feature/a-slice-is-marked-spike`, and its issue-write slice waits on Phase 4's `feature/the-tracker-lists-closed-issues`.
 
 ## Open Points
 
@@ -101,6 +101,8 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 | 2026-10-12 | D26. A declared phase outside the five default names renders as a column with no leadership badge and a neutral accent. Nothing refuses it. | jwloka. Answers Open Point 2. |
 | 2026-10-12 | D27. Stories stay in Discovery whatever the map says. The Discovery tab lists every story, and the Planning tab shows plans only. | jwloka. D1 gives Discovery to stories. Answers Open Point 3. |
 | 2026-10-12 | D28. The issue fold's spend and gate state live in the issue index file `issues.json`. The file carries `nextAt`, `backoffUntil` and the last pass's request count. The PR pass and the board read the file. fleetd is its one writer, and no new channel carries the gate. | jwloka. Under a fleet the issue gate lived in fleetd's memory, so neither the PR pass's subtraction nor the board's toggle had a source to read (panel round 3). |
+| 2026-10-12 | D29. Until `design-work-proves-the-path` ships the spike machinery, a spike-first plan is approved whole. Right after the approval, a `.plot/hold` line is written for every branch of that plan except the spike. A person removes the holds once the spike's Acceptance holds in CI. | jwloka. The approval clears the `.plot/hold` entry of every branch the plan names (`workflows/approve.ts:283-288`), so the holds are written after it. A hold refuses implementation commits on its branch (`rules/phase-gate.ts:149-160`). Decides the spike route that `design-work-proves-the-path`, `the-fleet-verifies-what-it-delivered` and `tickets-and-stories-have-lanes` left open. |
+| 2026-10-12 | D30. The Jira *Waiting on you* inbox read rides the issue pass: one gate, at most 30 Jira requests an hour, and an inbox read about every 22 minutes on a project with 1000 open tickets. | jwloka. One gate keeps one bound. A gate of its own for the inbox becomes a slice when an adopter reports a stale inbox. |
 
 ## Excluded from Scope
 
@@ -144,5 +146,9 @@ jwloka took D25 (the `Workflow phases` key and its grammar), D26 (a phase outsid
 ### 2026-10-12 — Round-3 revisions; plans become spike-first
 
 Panel round 3 questioned three plans. jwloka decided that each plan revises once more and then names its riskiest mechanism as a spike alone under its first slice heading, so that CI judges the mechanism instead of a fourth panel round. jwloka took D28: the issue gate's schedule and spend live in `issues.json`. `tickets-and-stories-have-lanes` was revised: its spike `feature/the-fleet-indexes-issues` builds the issue gate, the file and the PR pass's reading of it, and a new branch `feature/the-index-holds-closed-issues` takes the closed rows and the board's no-fleet gate. `DESIGN-phases.md` §5 carries D28. Two operator decisions are open in that plan: the spike's route before the spike machinery exists, and the Jira inbox's freshness.
+
+### 2026-10-12 — Decisions D29 and D30
+
+D29 and D30; cross-plan alignment after the spike-first revisions.
 
 ---
