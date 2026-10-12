@@ -423,6 +423,17 @@ export function PlanCard({
             "has anyone pushed on this yet?". A plan recording no round is
             marked `not interrogated` in an outlined badge; a recorded 0 is the
             filled `0 rounds`. The two must never look alike. */}
+        {card.verification?.badge && (
+          <span data-refuted-badge={card.slug} className="inline-flex">
+            <Badge
+              variant="neutral"
+              className="border border-red-400 bg-red-50 text-red-800 dark:border-red-500 dark:bg-red-950 dark:text-red-200"
+              title="Verification refuted claims of this delivered plan; see ## Verification in the plan"
+            >
+              {card.verification.badge}
+            </Badge>
+          </span>
+        )}
         {roundsBadgeText(card) && (
           <span data-rounds={roundsRecorded(card) ? 'recorded' : 'absent'} className="inline-flex">
             <Badge
