@@ -4,6 +4,7 @@
 
 - **State:** Released
 - **Type:** feature
+- **Released:** 2026-08-28, v2.11.0
 - **Sprint:** <!-- not a member of the-board-tells-the-truth-in-every-section -->
 - **Issue:** <!-- optional -->
 - **Story:** <!-- optional -->
