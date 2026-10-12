@@ -8,6 +8,7 @@
 - **State:** Released
 - **Type:** feature
 - **Sprint:** the-board-serves-an-enterprise-stack
+- **Released:** 2026-08-28, v2.11.0
 - **Issue:** <!-- optional -->
 - **Story:** setup-asks-what-the-repo-already-knows
 - **Review:** in-session
