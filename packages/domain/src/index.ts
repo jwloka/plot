@@ -182,6 +182,7 @@ export type {
  */
 export {
   approve as approveTransition,
+  needsDesign,
   approveSpike as approveSpikeTransition,
   deliver as deliverTransition,
   release as releaseTransition,
@@ -207,6 +208,7 @@ export type {
   Decision as PhaseDecision,
   Refusal as PhaseRefusal,
   ApproveInput as ApproveTransitionInput,
+  NeedsDesignInput,
   ApproveSpikeInput as ApproveSpikeTransitionInput,
   SpikeDecision,
   SpikeResult,

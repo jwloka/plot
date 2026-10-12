@@ -9,6 +9,7 @@ import {
 } from '../../../contract/schema.js';
 import { ApproveButton } from '../../components/ApproveButton.js';
 import { CommissionDesignButton } from '../../components/CommissionDesignButton.js';
+import { NeedsDesignButton } from '../../components/NeedsDesignButton.js';
 import { CreatePlanButton } from '../../components/CreatePlanButton.js';
 import {
   CreateStoryButton,
@@ -1459,12 +1460,15 @@ export function PlanActions({
   // branch menu and the card came to disagree in the first place.
   //
   // Approve reads `controls.approve` (a `draft` or `design` plan) and
-  // Commission design reads `controls.commission` (a `draft` plan only, the one
+  // Commission design reads `controls.needsDesign` (a `draft` plan only, the one
   // state `server/commission.ts` accepts). Each then asks its OWN binding
   // whether the server will act, below.
   const isDraftPlan = Boolean(card && isDraft(card));
   const canApprove = Boolean(isDraftPlan && approve);
-  const canCommission = Boolean(card?.controls.commission && commission);
+  const canCommission = Boolean(card?.controls.needsDesign && commission);
+  // Needs design reads `controls.needsDesign` (a `draft` plan only) and asks the
+  // Approve binding whether the server will act: both are a local, same-origin act.
+  const canNeedsDesign = Boolean(card?.controls.needsDesign && approve);
   // Deliver's OWN gate, disjoint from the draft one: the card's `deliverable`
   // bit, which the server sets only where it auto-bumped a fully-merged plan
   // into Testing — never on a plan already delivered. So this is true on exactly
@@ -1483,7 +1487,7 @@ export function PlanActions({
   // bindings refused has nothing to show but a tooltip, which is the behaviour
   // #160 settled and this must not disturb.
   const draftWillAct =
-    (canApprove && approveWillAct) || (canCommission && commissionWillAct);
+    (canApprove && approveWillAct) || (canCommission && commissionWillAct) || (canNeedsDesign && approveWillAct);
   // The APPROVED acts follow `DeliverButton`'s shape: the menu opens on an
   // eligible approved plan EVEN WHEN the server refuses or the route is missing.
   // Implement states its own refusal (no route yet); Dispatch states the server's.
@@ -1574,6 +1578,11 @@ export function PlanActions({
           {canApprove && approveWillAct && approve && (
             <div role="menuitem" className="px-2 py-1 text-left">
               <ApproveButton card={card} approve={approve} onApproving={onApproving} />
+            </div>
+          )}
+          {canNeedsDesign && approveWillAct && approve && (
+            <div role="menuitem" className="px-2 py-1 text-left">
+              <NeedsDesignButton card={card} availability={approve} onActing={onApproving} />
             </div>
           )}
           {canCommission && commissionWillAct && commission && (

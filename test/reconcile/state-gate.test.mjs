@@ -182,6 +182,34 @@ test('state gate: an owning script’s receipt clears the transition', () => {
   assert.equal(r.status, 0, `the owner must pass (stderr: ${r.stderr})`);
 });
 
+// Draft -> Design is a person's move. `plot-needs-design.mjs` writes its receipt
+// with the TypeScript `recordStateReceipt` in `entry/ladder.ts`, so this case
+// calls that writer, not the shell `record_state_receipt` the owners above use.
+test('state gate: Draft -> Design passes with the needs-design bundle’s receipt', async () => {
+  const { recordStateReceipt } = await import(
+    path.join(here, '..', '..', 'packages', 'board', 'src', 'server', 'entry', 'ladder.ts')
+  );
+  const dir = repo({
+    committed: { 'docs/plans/2026-01-01-x.md': plan('Draft') },
+    files: { 'docs/plans/2026-01-01-x.md': plan('Design') },
+  });
+  recordStateReceipt(dir, 'docs/plans/2026-01-01-x.md', 'Design');
+  assert.ok(existsSync(path.join(dir, '.plot', 'state', 'state-receipts')), 'the bundle writer left a receipt');
+  const r = run(dir);
+  assert.equal(r.status, 0, `the bundle's receipt must pass (stderr: ${r.stderr})`);
+});
+
+test('state gate: Draft -> Design is refused without a receipt and names needs-design', () => {
+  const dir = repo({
+    committed: { 'docs/plans/2026-01-01-x.md': plan('Draft') },
+    files: { 'docs/plans/2026-01-01-x.md': plan('Design') },
+  });
+  const r = run(dir);
+  assert.equal(r.status, 2, `must block (stderr: ${r.stderr})`);
+  assert.match(r.stderr, /Draft -> Design/);
+  assert.match(r.stderr, /needs-design x/, 'the refusal names the command that owns the write');
+});
+
 // One approval licenses one commit. A receipt left behind would clear a `sed`
 // over the same line a week later, which is the case this gate exists for.
 test('state gate: a receipt is spent when it clears', () => {

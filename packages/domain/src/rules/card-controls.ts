@@ -6,6 +6,7 @@ import { spikeOf, type SpikeSlice } from './spike.js';
 /** The controls a plan card offers. Each boolean answers whether the card renders that control. */
 export const CardControlsSchema = z.object({
   approve: z.boolean(),
+  needsDesign: z.boolean().default(false),
   interrogate: z.boolean(),
   commission: z.boolean(),
   roundsBadge: z.boolean(),
@@ -33,7 +34,7 @@ export interface CardControlsReadings {
  * The controls a plan card offers.
  *
  * `approve` and `interrogate` hold on the `draft` and `design` states.
- * `commission` and `roundsBadge` hold on the `draft` state only: the commission
+ * `needsDesign`, `commission` and `roundsBadge` hold on the `draft` state only: the commission
  * command refuses every other state, and the interrogation-rounds badge shows
  * on a Draft card only. `dispatch` holds where `status` is `approved` or `in-progress`. `readyToStart` holds where
  * `dispatch` holds and the plan records no `Started:` entry.
@@ -45,7 +46,7 @@ export interface CardControlsReadings {
  * only branch of the first slice and which records no `Spike approved:` line.
  *
  * @param readings - the plan's state, status, started record, slices and spike record.
- * @returns the seven control booleans.
+ * @returns the eight control booleans.
  */
 export const cardControls = (readings: CardControlsReadings): CardControls => {
   const draft = readings.state === 'draft';
@@ -61,6 +62,7 @@ export const cardControls = (readings: CardControlsReadings): CardControls => {
     slices[0].branches.length === 1;
   return {
     approve: underReview,
+    needsDesign: draft,
     interrogate: underReview,
     commission: draft,
     roundsBadge: draft,
