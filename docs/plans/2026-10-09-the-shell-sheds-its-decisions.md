@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Delivered
+- **State:** Released
 - **Type:** infra
 - **Issue:** #1404
 - **Story:** the-shell-holds-no-behavior
@@ -17,6 +17,7 @@
 - **Started:** 2026-10-09, jwloka, `feature/the-reaper-becomes-a-command`
 - **Started:** 2026-10-09, jwloka, `feature/approval-becomes-a-command`
 - **Delivered:** 2026-10-09
+- **Released:** 2026-10-10, v2.25.0
 
 ## Changelog
 
