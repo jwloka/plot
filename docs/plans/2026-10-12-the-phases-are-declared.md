@@ -12,6 +12,7 @@
 - **Rounds:** 2
 - **Approved:** 2026-10-12, Jan Wloka, plan-PR #1608 merged
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-board-draws-the-declared-phases`
+- **Started:** 2026-10-12, Jan Wloka, `feature/the-idea-asks-about-design`
 
 ## Changelog
 
