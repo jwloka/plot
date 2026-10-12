@@ -1,9 +1,10 @@
 ---
 title: The supervisor delivers the approved scope
 author: jwloka
-status: active
+status: done
 created: 2026-10-05
 updated: 2026-10-12
+archived: 2026-10-12
 ---
 
 # The supervisor delivers the approved scope
@@ -44,19 +45,19 @@ None of these needed new judgement. Each needed the supervisor to notice a stop 
 
 | Plan | Stop it handles | State |
 |---|---|---|
-| [`an-unanswered-question-escalates`](../../plans/2026-10-05-an-unanswered-question-escalates.md) | An agent's question waits unanswered | Released, v2.24.0 |
-| [`the-build-monitor-asks-for-the-pushed-commit`](../../plans/2026-10-05-the-build-monitor-asks-for-the-pushed-commit.md) | The BuildMonitor misses a run (#1275, #1255) | Released, v2.24.0 |
-| [`a-spent-correction-budget-gets-a-fresh-agent`](../../plans/2026-10-05-a-spent-correction-budget-gets-a-fresh-agent.md) | A slice spends its correction budget | Released, v2.24.0 |
-| [`fleet-agents-run-through-the-agent-sdk`](../../plans/2026-10-05-fleet-agents-run-through-the-agent-sdk.md) | An agent waits inside its session for checks and CI | Released, v2.24.0 |
-| [`every-loop-ending-has-a-supervisor-rule`](../../plans/2026-10-07-every-loop-ending-has-a-supervisor-rule.md) | A loop ending with no supervisor action (#1274, #1288, #1281) | Released, v2.24.1 |
+| [`an-unanswered-question-escalates`](../../../plans/2026-10-05-an-unanswered-question-escalates.md) | An agent's question waits unanswered | Released, v2.24.0 |
+| [`the-build-monitor-asks-for-the-pushed-commit`](../../../plans/2026-10-05-the-build-monitor-asks-for-the-pushed-commit.md) | The BuildMonitor misses a run (#1275, #1255) | Released, v2.24.0 |
+| [`a-spent-correction-budget-gets-a-fresh-agent`](../../../plans/2026-10-05-a-spent-correction-budget-gets-a-fresh-agent.md) | A slice spends its correction budget | Released, v2.24.0 |
+| [`fleet-agents-run-through-the-agent-sdk`](../../../plans/2026-10-05-fleet-agents-run-through-the-agent-sdk.md) | An agent waits inside its session for checks and CI | Released, v2.24.0 |
+| [`every-loop-ending-has-a-supervisor-rule`](../../../plans/2026-10-07-every-loop-ending-has-a-supervisor-rule.md) | A loop ending with no supervisor action (#1274, #1288, #1281) | Released, v2.24.1 |
 
 The three remaining stops have no plan under this story. Each issue is named in the `Issue` field of a Released plan that names no story:
 
 | Stop | Issue | Plan that names the issue | State |
 |---|---|---|---|
-| A claim nobody works | #1276 | [`a-controller-owns-what-it-starts`](../../plans/2026-10-07-a-controller-owns-what-it-starts.md) | Released, v2.24.1 |
-| Deliver refuses a finished plan | #1280 | [`delivery-reads-one-source`](../../plans/2026-10-07-delivery-reads-one-source.md) | Released, v2.24.1 |
-| CI read as running after it finished | #1277 | [`the-board-reads-a-pr-while-its-ci-runs`](../../plans/2026-10-07-the-board-reads-a-pr-while-its-ci-runs.md) | Released, v2.24.1 |
+| A claim nobody works | #1276 | [`a-controller-owns-what-it-starts`](../../../plans/2026-10-07-a-controller-owns-what-it-starts.md) | Released, v2.24.1 |
+| Deliver refuses a finished plan | #1280 | [`delivery-reads-one-source`](../../../plans/2026-10-07-delivery-reads-one-source.md) | Released, v2.24.1 |
+| CI read as running after it finished | #1277 | [`the-board-reads-a-pr-while-its-ci-runs`](../../../plans/2026-10-07-the-board-reads-a-pr-while-its-ci-runs.md) | Released, v2.24.1 |
 
 The order follows the delivery time each stop cost. A plan joins this story when it names `Story: the-supervisor-delivers-the-approved-scope` in its `## Status`.
 
@@ -68,11 +69,12 @@ The order follows the delivery time each stop cost. A plan joins this story when
 
 ## Related
 
-- [`the-master-agent-holds-the-fleet`](../the-master-agent-holds-the-fleet/STORY-the-master-agent-holds-the-fleet.md) — the fleet's entity design (`DESIGN-agent.md`, `DESIGN-process.md`); this story adds the supervisor's duty under auto-dispatch.
-- [`the-worker-loop-runs-in-js`](../../plans/2026-10-04-the-worker-loop-runs-in-js.md) — every loop ending that waits for a person writes a `blocked` declaration, which this story's escalation reads as a second signal.
+- [`the-master-agent-holds-the-fleet`](../../the-master-agent-holds-the-fleet/STORY-the-master-agent-holds-the-fleet.md) — the fleet's entity design (`DESIGN-agent.md`, `DESIGN-process.md`); this story adds the supervisor's duty under auto-dispatch.
+- [`the-worker-loop-runs-in-js`](../../../plans/2026-10-04-the-worker-loop-runs-in-js.md) — every loop ending that waits for a person writes a `blocked` declaration, which this story's escalation reads as a second signal.
 
 ## Session Log
 
 ### 2026-10-12
 
 - The estate on `main` shows all five plans that name this story Released: four in v2.24.0 and `every-loop-ending-has-a-supervisor-rule` in v2.24.1. The three stops listed as "to draft" (#1276, #1280, #1277) are named by three plans of sprint `the-release-train-fixes-what-it-found`, Released in v2.24.1.
+- jwloka archived the story as done: every stop in "Why Now" has a Released plan.
