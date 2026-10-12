@@ -5,6 +5,7 @@
 - **State:** Released
 - **Type:** bug
 - **Sprint:** the-board-tells-the-truth-in-every-section
+- **Released:** 2026-08-28, v2.11.0
 - **Issue:** <!-- optional -->
 - **Story:** <!-- optional -->
 - **Review:** in-session
