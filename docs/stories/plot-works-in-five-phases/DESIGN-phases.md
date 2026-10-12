@@ -236,6 +236,11 @@ The issue index keeps the tickets closed in the last 14 days (D19). The Done lan
 
 **Retention (D19).** The tracker port lists closed issues. The issue index holds the open tickets and the tickets closed in the last 14 days, and the board reads them through the index (D7). With the toggle on, the tab reads every closed ticket from the host on demand, capped at 1000, and that answer is not written to the index. The fleet stays the index's one writer.
 
+**The issue gate (D28).** fleetd reads the issues on a gate of its own, at most 30 requests an hour per repository: a pass of `n` requests opens the gate again after `max(120 s, n × 120 s)`. The issue index file `issues.json` carries the gate with the rows: `nextAt`, `backoffUntil`, the last pass's request count, and the connector and account the pass spent. fleetd is its one writer, and no new channel carries the gate. Two readers read it:
+
+- **The PR pass** holds its own gate until `backoffUntil` where the issue pass spent its own connector and account, and never moves its gate earlier. It subtracts the issue pass's spend from the rate its cadence divides by under the same condition, and the spend banner keeps the account's whole rate. A Jira source spends the Jira account, so the PR pass neither subtracts it nor shares its backoff.
+- **The board** reads the gate to pace the archived toggle's closed read and to hold it during a backoff. With no fleet, the board keeps the same fields in memory and writes no file.
+
 **Scope (D20, D23).** On Jira the lanes show every ticket of the declared projects, not only the current user's: the lanes' open and closed reads drop the `assignee = currentUser()` clause that the Jira inbox reads today (`plot-host.sh:4684`). The project-wide read needs `Ticket prefixes`: with none declared, the open read keeps today's query and the lanes show the reader's own tickets, because an unscoped read without the person clause covers the whole Jira instance. The inbox keeps today's read beside the lanes read (D23, *Delivery* below). The drop lands only after the Delivery tab's assignee filter exists.
 
 ### Planning

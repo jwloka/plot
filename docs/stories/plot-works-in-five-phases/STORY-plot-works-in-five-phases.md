@@ -20,7 +20,7 @@ The design spec is [DESIGN-phases.md](DESIGN-phases.md).
 
 ## Decisions Taken in Scoping
 
-Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`. Decisions D25 to D27 were taken on 2026-10-12 and answer Open Points 1 to 3.
+Decisions D1 to D12 in the Decisions table were taken in one brainstorming session on 2026-10-12. The decomposition into six plans was taken in the same session. Decisions D13 to D22 were taken on 2026-10-12 after panel round 1, and answer the operator decisions that the revised plans listed. Decisions D23 and D24 were taken on 2026-10-12 after panel round 2 of `tickets-and-stories-have-lanes`. Decisions D25 to D27 were taken on 2026-10-12 and answer Open Points 1 to 3. D28 was taken on 2026-10-12 after panel round 3 of `tickets-and-stories-have-lanes`.
 
 ## Current Plan
 
@@ -38,7 +38,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 
 ### Phase 4: Tickets and stories have lanes ⏸️
 
-- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and archived toggle, and the project-wide Jira read (D20, D23). Waits on Phase 3; the Jira slice waits on Phase 3's assignee filter.
+- ⏸️ [`tickets-and-stories-have-lanes`](../../plans/2026-10-12-tickets-and-stories-have-lanes.md) — a spike that builds the issue gate and its spend sharing with the PR pass (D28), closed issues through the index, the ticket and story lane rules, the Discovery tab with its tag cloud and archived toggle, and the project-wide Jira read (D20, D23). Waits on Phase 3; the Jira slice waits on Phase 3's assignee filter.
 
 ### Phase 5: The fleet writes the design ⏸️
 
@@ -100,6 +100,7 @@ Decisions D1 to D12 in the Decisions table were taken in one brainstorming sessi
 | 2026-10-12 | D25. The key is `Workflow phases`, with the proposed grammar: one line, `;` between phases, `,` between members, and a `story:` or `plan:` prefix on every member, for example `- **Workflow phases:** Discovery = story:*; Design = plan:draft, plan:design; Development = plan:approved; Testing = plan:delivered; Released = plan:released`. | jwloka. Answers Open Point 1. |
 | 2026-10-12 | D26. A declared phase outside the five default names renders as a column with no leadership badge and a neutral accent. Nothing refuses it. | jwloka. Answers Open Point 2. |
 | 2026-10-12 | D27. Stories stay in Discovery whatever the map says. The Discovery tab lists every story, and the Planning tab shows plans only. | jwloka. D1 gives Discovery to stories. Answers Open Point 3. |
+| 2026-10-12 | D28. The issue fold's spend and gate state live in the issue index file `issues.json`. The file carries `nextAt`, `backoffUntil` and the last pass's request count. The PR pass and the board read the file. fleetd is its one writer, and no new channel carries the gate. | jwloka. Under a fleet the issue gate lived in fleetd's memory, so neither the PR pass's subtraction nor the board's toggle had a source to read (panel round 3). |
 
 ## Excluded from Scope
 
@@ -139,5 +140,9 @@ Round-2 revisions and cross-plan alignment. The changes that the round-2 revisio
 ### 2026-10-12 — Decisions D25 to D27
 
 jwloka took D25 (the `Workflow phases` key and its grammar), D26 (a phase outside the five default names has no leadership badge and a neutral accent) and D27 (stories stay in Discovery whatever the map says). Open Points 1 to 3 are closed, and `DESIGN-phases.md` and `the-phases-are-declared` carry the three decisions.
+
+### 2026-10-12 — Round-3 revisions; plans become spike-first
+
+Panel round 3 questioned three plans. jwloka decided that each plan revises once more and then names its riskiest mechanism as a spike alone under its first slice heading, so that CI judges the mechanism instead of a fourth panel round. jwloka took D28: the issue gate's schedule and spend live in `issues.json`. `tickets-and-stories-have-lanes` was revised: its spike `feature/the-fleet-indexes-issues` builds the issue gate, the file and the PR pass's reading of it, and a new branch `feature/the-index-holds-closed-issues` takes the closed rows and the board's no-fleet gate. `DESIGN-phases.md` §5 carries D28. Two operator decisions are open in that plan: the spike's route before the spike machinery exists, and the Jira inbox's freshness.
 
 ---
