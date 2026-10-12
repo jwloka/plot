@@ -1,0 +1,24 @@
+# Juror: domain and layering
+
+Position: amend
+
+## Facts checked on origin/main (0d2b4d5c)
+
+- The diagnosis is true. `prWindowFor` returns `{ since, complete: false }` for a delta (`packages/domain/src/rules/pr-index.ts:172`), `fleet.ts:3007` folds `complete = window.complete && partialSaid === null`, `foldPrIndex` writes `complete: update.complete` (`rules/pr-index.ts:104`), and the next window returns a full read on `!held.complete` (`rules/pr-index.ts:164`). The store alternates, so every second refresh pays the 43 s read. `PR_FULL_READ_MS` is at `fleet.ts:311`.
+- The cited tests exist at the cited lines: `pr-index.test.ts:350` (*a delta is never complete*), `pr-store.test.ts:350`, `:474`, `:493`, `:535`, `:558`.
+- `host_failure_kind` (`plot-host.sh:474-482`), the login line (`plot-host.sh:527`) and `host_repair` in `pr_list_failed` (`plot-host.sh:564`) are as stated. `host_failure_kind` has one caller (`plot-host.sh:542`), so slice 3 changes no other op.
+- The shell readers do not read `complete` for a decision: `pr-index-lookup-answer.ts:151-164` answers MERGED rows or `ask`. Slice 1 keeps "the index never says no".
+- Slice 1 respects the layering rule: the answer kind is a domain word, the fold and the window stay in `rules/pr-index.ts`, and vendor words stay in `plot-host.sh`.
+
+## Required changes
+
+1. Slice 1 must name `PrWindow` as changed, not only `PrIndexUpdate`. `PrWindow.complete` (`rules/pr-index.ts:125`) is the same word with the old meaning. Replace it with the kind (`whole` or `delta`), and put the mapping from window and partial answer to `whole | delta | partial` in the domain, as one exported arrow with a test. Today `fleet.ts:3007` does that arithmetic in the controller, and the plan keeps it there ("the kind passed at fleet.ts:3007").
+2. Slice 1 must keep `fleet.ts:3039` (`if (complete || folded === null)`) keyed on the answer kind `whole`, never on `folded.complete`. After this plan a delta fold reads `complete: true`; a controller that reads the store flag there serves the window's 0-3 rows and reports every other branch as having no PR. Name `pr-store.test.ts:442` (*a delta whose window returns 3 rows still serves 933*) in the slice's test list as a test that must stay green unchanged.
+3. Slice 1 must list every hardcoded version-2 fixture it touches: `pr-index.test.ts:249` (`expect(PR_INDEX_VERSION).toBe(2)`), `test/reconcile/impl-status-index.test.mjs:313`, `test/reconcile/scan-index.test.mjs:279` and `packages/board/test/unit/registryd-main.test.ts:1268` all write `v: 2`. It must also rebuild `skills/plot/scripts/board/plot-pr-index-lookup.mjs` (and `board-server.mjs`) in the same slice. A stale lookup bundle reads every version-3 store as null, so `plot-impl-status.sh` and `plot-reconcile-scan.sh` silently go back to one host call per question. Add to Done-when: `impl-status-index.test.mjs` *a fully merged plan is answered from the store with no host call* and `scan-index.test.mjs` *a store answering every asked branch removes the merged-list call* pass against a version-3 fixture.
+4. Slice 2 puts a fold decision in the controller. "A terminal row takes its verdict fields from the stored row with the same number" reads `held`, and only `foldPrIndex` reads `held`. Today a whole answer starts empty (`rules/pr-index.ts:84-88`), so the carry-over contradicts the current rule. The slice must state the rule in `packages/domain/src/rules/pr-index.ts` with tests in `packages/domain/test/pr-index.test.ts`: (a) a plain row inherits `checks`, `review`, `mergeable` and `failing_checks` from the held row with the same number; (b) where the open arm and the plain arm both return a number, the open arm's row wins; (c) a PR that merges between the two calls is resolved by one named rule. It must also say which maps a whole read serves: `fleet.ts:3039-3042` serves the pass's own rows on a whole read, so terminal rows reach `prsByHead` (`fleet.ts:6506`) without the carried fields unless the board serves the fold.
+5. Slice 2 must state the answer when one of its two calls fails. The plan covers a failed open call. It does not cover a failed plain call after a good open call: that is not `whole`, and the slice must say if it folds as `partial` or leaves the store untouched.
+6. The TSDoc that slice 1 rewrites must describe the new behaviour in the domain package's factual style: `complete` in `entities/pr-index.ts` (*covered every state*), the latch paragraph of `foldPrIndex` (`rules/pr-index.ts:74-76`), the clock paragraph of `prWindowFor` (`rules/pr-index.ts:142-146`, which names `at`), and the latch reference at `pr-index-lookup-answer.ts:141-142`. New exports are arrows (`packages/domain` rule).
+
+## Not required
+
+- Slice 3 is complete as written. Its tests keep `throttled` and `secondary` ahead of `timeout`, which the order comment at `plot-host.sh:470-473` requires.
