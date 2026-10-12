@@ -14,6 +14,7 @@
 - **Impl:** same branch
 - **Approved:** 2026-08-16, jwloka, in-session
 - **Started:** 2026-08-16, jwloka, `feature/push-main-bypass`
+- **Released:** 2026-08-18, v2.5.0
 
 ## Approval
 
