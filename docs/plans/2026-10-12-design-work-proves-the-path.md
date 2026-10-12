@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 2
+- **Rounds:** 3
 
 ## Changelog
 
@@ -127,6 +127,18 @@ The margin holds if the additions are twice the estimate (about +36 against −4
 - [x] Panel round 2, contradiction (LOW): the glob `plot-approve*.mjs`, the Changelog over-claim and `Review: ballot`. Resolved: no second `plot-approve*` name ships; the Changelog names plans in Design only; a `ballot` plan keeps its tally (`approvalArm` answers `ballot`).
 - [x] Panel round 2 (LOW): `PlanReadings` has no `tracer`, `skills/plot/SKILL.md:284` describes no code, Notes gave a stale reason for the tracer slices' position, skill edits need `bumps:`, and `spike-unmerged` left its adapter open. Resolved: *The tracer plan* names `PlanReadings.tracer` and its builders; slice 5 rewrites `:284`; the Note is corrected; each slice that edits a skill names its `bumps:` entry and Model Guidance row; `spike-unmerged` reads the host port's `prMerged`.
 - [x] Panel round 2, moderator blind spot: no test proves the spike path end to end. Resolved: *Acceptance* adds `test/e2e/spike-dispatch.test.mjs`, which CI's `test:e2e` job runs on the dispatch slice's PR.
+- [ ] Panel round 3, contradiction (MEDIUM): the state gate passes a commit that removes `State:` and one that adds it where HEAD had none (`rules/state-transition.ts:131-141`), so two hand commits move a Design plan to `Draft` and onto the `pr` arm with no person. The sentence "the state gate already refuses a hand edit of it" in *The approval of a Design plan is a person's act* is false, and `DESIGN-phases.md:177` repeats it. Extend the slice-2 removal refusal to the `State:` line of a plan, or narrow the claim.
+- [ ] Panel round 3, contradiction (MEDIUM) and cost (LOW): the bundle's `inSession` reading (`entry/approve.ts:480`) also decides `sameBranch` and the plan-PR read (`:488-491`), and the workflow's `inSession` skips the PR merge (`workflows/approve.ts:229`, `:249-254`). Routing the person arm through it breaks "an open plan PR still merges". Give the person arm its own reading.
+- [ ] Panel round 3, contradiction and cost (MEDIUM): the slice-1 dispatch rewrite keeps the admission set and exit codes for non-Design plans but drops the shell's next-command hints (`/plot-approve`, `/plot-idea`, `/plot-implement`, the valid `Impl:` answers). `test/reconcile/dispatch.test.mjs:975`, `:1004` and `:1030` assert them, and "the contract tests read the domain's words" deletes that guarantee. Keep the hints in the `plangate` refusal or its printer and keep the assertions; name the exit code.
+- [ ] Panel round 3, contradiction and cost (LOW): `plangate` is module-private (`workflows/dispatch.ts:486`), `plot-ask.mjs` has no `plangate` question, and it needs `source`, `refResolved` and the ref option beside the plan-meta JSON (`dispatch.test.mjs:2552` asserts `origin/main` in the message). Name the export and its inputs, and say that `plot-dispatch.sh` refuses when the bundle is missing or the call fails.
+- [ ] Panel round 3, cost (MEDIUM): slice 1 is now the widest PR of the plan (about 15 files) and changes dispatch for every plan; once later slices touch the same paths, a revert of it is not exact. State this in the slice, and keep the dispatch rewrite as its own commit.
+- [ ] Panel round 3, cost (LOW): the shell estimate is low; realistic additions are about +25 to +30, a net of about −16 to −21. The slice still passes the ratchet; correct the table or its margin sentence.
+- [ ] Panel round 3, contradiction (LOW): the controller gate's refusal for `plot-approve.mjs --spike` names `POST /api/approve` without `"spike": true` (`rules/controller-gate.ts:113`), so an agent that follows it runs a full approval; and `--spike --dry-run` is ungated. Name both in slice 3.
+- [ ] Panel round 3, contradiction (LOW): the HTTP script arm takes `who` from the request body (`server/approve.ts:288-295`), and the unattended refusal reads the board's environment, so "on every route" is a rule there, not a gate. Say so.
+- [ ] Panel round 3, cost (LOW): `POST /api/approve` answers no 409 for a plan with no `State:` line and starts an agent that can only refuse. Refuse it before the start.
+- [ ] Panel round 3, contradiction (LOW): between the merge of `feature/a-draft-can-need-design` and slice 2, a `Review: pr` Design plan approves on the `pr` arm. Name the window, or move the person arm into the sibling slice.
+- [ ] Panel round 3, contradiction (LOW): `the-fleet-writes-the-design` line 27 and `DESIGN-phases.md:176` still cite the shell `case` copy as a change of the dispatch slice; slice 1 now deletes it.
+- [ ] Panel round 3, moderator blind spot: no round has read whether the receipt reader behind `plot-state-gate.sh` matches the key `<plan path>#Spike approved` exactly, so that it never spends as a `State:` receipt. Cite the reader's match.
 
 ## Slices
 

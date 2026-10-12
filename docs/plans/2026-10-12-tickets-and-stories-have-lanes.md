@@ -9,7 +9,7 @@
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Impl:** own branches
-- **Rounds:** 2
+- **Rounds:** 3
 
 ## Changelog
 
@@ -158,6 +158,17 @@ Archived means the location: a story moved under `<Story directory>/archived/`, 
   - *The shell lines* names the lines that pay for the new arms.
   - `derivedStanding` is cited at `transitions/story.ts:397`.
   - The Done lane draws 20 rows by D24, which answers the round-2 blind spot of 154 rows in a 14-day lane.
+- [ ] [Technical] The PR pass's subtraction has no input and no source condition. No `PrState` field carries the fold's spend, and `spend-rate` reads the git host's connector (`plot-host.sh:5236`), so on a Jira source the subtraction under-counts other spenders by up to 30 an hour; the shared backoff needs the same condition, and must not move the PR gate earlier (`max(prNextAt, now + wait)`). Name the field, subtract in `refreshPrs` after `pr-refresh.ts:1341` and before `scheduleNextPr` (`:1024-1033`) so the banner at `:1345` keeps the raw rate, and skip it on a Jira source. — *panel round 3, cost, contradiction (must change)*
+- [ ] [Technical] The toggle endpoint cannot see the issue gate under a fleet. The interval and backoff live in fleetd's memory, the bridge carries only `prError` (`ports/fleet-state.ts:84`), and `issues.json` holds neither, so the plan's cache rule and Acceptance on the toggle cannot hold with a fleet running; the toggle's reads (up to 15 an hour here, 150 at the 1000-row cap) are outside the 90. Put the interval and backoff end where the board reads them, and price the toggle. — *panel round 3, cost, contradiction (must change)*
+- [ ] [Performance] The 120 → 90 figure. Under a fleet the board's 60 s `issue-list` calls stretch the fleetd PR pass to 480 s (`cadence.ts:97-101`), so GitHub spends about 67.5 an hour today and the change adds about 22–30; Bitbucket spends 105 with a fleet and 60 without, so a Bitbucket board with no fleet rises 60 → 90. The PR table counts questions and the fold counts pages. State the figure per mode and per git host, and the PR freshness change (480 s → 60 s). — *panel round 3, cost, contradiction (must change)*
+- [ ] [Technical] The shell lines do not balance. With the gate's count (`check-shell-lines.sh:41-46`) the named dedupes save at most 10 lines, `jira_search_pages` adds lines, the new arms add about 18–23, and the D20 slice names none. Count each slice's balance, or name more lines. — *panel round 3, cost (must change); contradiction (open point)*
+- [ ] [Technical] The port-doc amendment misses two passages. `ports/tracker.ts:77-82` ("owns its OWN budget") and `CLAUDE.md:372-380` ("neither ever sees the other's credentials or budget") also contradict `trackerGitHost`; the `@returns` lines are at `:106` and `:119`. Add both to slice 1's edit. — *panel round 3, contradiction (must change); cost (note)*
+- [ ] [Technical] One `issues.json` per repository against `DESIGN-index.md:122`, `:128`, which say the index is per connector and describe a Jira delta read; and `source` may be a verdict the board can derive, which `CLAUDE.md:485-487` allows for `default-branch.json` alone. State the divergence or follow the design. — *panel round 3, contradiction (open point)*
+- [ ] [Performance] On a large Jira project after D20, *Waiting on you* refreshes every 22–42 minutes instead of 60 s, and the plan names no Jira page size. — *panel round 3, cost (open point)*
+- [ ] [Technical] Smaller points. — *panel round 3, contradiction (notes)*
+  - "Inbox and lanes come from the same rows" is false for Jira after D23; say "the same pass".
+  - The D23 inbox read duplicates the open read when `Ticket prefixes` is absent.
+  - Plan `:70` says "120–480 s here"; the value here is 480 s, as the Changelog says.
 
 ## Acceptance
 
