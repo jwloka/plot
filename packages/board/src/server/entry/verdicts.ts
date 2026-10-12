@@ -60,7 +60,10 @@ export interface SliceLine extends SliceReadings {
 }
 
 /**
- * Parse one slice per line: `outstanding<TAB>phase<TAB>state|state|...`.
+ * Parse one slice per line: `outstanding<TAB>phase<TAB>state|state|...`, then
+ * optionally `<TAB>spike<TAB>spikeApproved` — `1` or `0` for a spike branch in
+ * the slice, and `1` or `0` for a `Spike approved:` record in the plan. The
+ * rule does not read the two columns yet.
  *
  * A line that does not parse is NOT skipped. An unreadable count would silently
  * become `0` and read `complete` — the verdict that says work has landed — so a
@@ -80,7 +83,7 @@ export const slicesFrom = (text: string): SliceLine[] =>
     .split('\n')
     .filter((line) => line !== '')
     .map((line, i) => {
-      const [count, phase, states] = line.split('\t');
+      const [count, phase, states, spike, spikeApproved] = line.split('\t');
       const outstanding = Number(count);
       if (!Number.isInteger(outstanding) || outstanding < 0
         || phase === undefined || states === undefined) {
@@ -89,7 +92,16 @@ export const slicesFrom = (text: string): SliceLine[] =>
         );
       }
       const parsed = states === '' ? [] : states.split('|');
-      return { outstanding, phase, states: parsed, branches: parsed.length };
+      return {
+        outstanding,
+        phase,
+        states: parsed,
+        branches: parsed.length,
+        // Both ABSENT where the line stops at the states, so an older caller's
+        // line reads as unread rather than as `false`.
+        ...(spike === undefined ? {} : { spike: spike === '1' }),
+        ...(spikeApproved === undefined ? {} : { spikeApproved: spikeApproved === '1' }),
+      };
     });
 
 /**

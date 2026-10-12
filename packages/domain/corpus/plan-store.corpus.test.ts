@@ -70,6 +70,10 @@ const KNOWN_UNCARRIED = [
   'review_raw',
   'impl_raw',
   'design_raw',
+  // The scan carries it to the verdict line as `1`/`0`; no PlanStore reader decides on it.
+  'spike_approved_raw',
+  // The scan carries it to the pulse plan; no PlanStore reader decides on it.
+  'tracer',
   'issues',
   'malformed_prs',
   'changelog',
