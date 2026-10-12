@@ -8,6 +8,7 @@
 - **State:** Released
 - **Type:** feature
 - **Sprint:** the-board-serves-an-enterprise-stack
+- **Released:** 2026-08-28, v2.11.0
 - **Issue:** <!-- optional -->
 - **Story:** the-board-is-blank-where-it-matters
 - **Review:** in-session
