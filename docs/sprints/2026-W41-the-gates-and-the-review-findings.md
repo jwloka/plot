@@ -4,7 +4,8 @@
 
 ## Status
 
-- **State:** Active
+- **State:** Closed
+- **Actual End:** 2026-10-12
 - **Start:** 2026-10-10
 - **End:** 2026-10-23
 - **Release:** 2.26.0
@@ -42,7 +43,36 @@ On `main` at `eb4bda159`, 2026-10-10, `skills/plot/scripts/README.md` lists 15 *
 
 ## Retrospective
 
-<!-- Filled during /plot-sprint close: What went well / What could improve / Action items -->
+### What went well
+
+- All five items shipped in v2.26.0 on 2026-10-11, three days into a fourteen-day timebox.
+- The fleet delivered with auto-dispatch on: 76 pull requests merged into `main` from 2026-10-10 to 2026-10-12.
+- Each fleet pull request got one review, and MEDIUM and LOW findings went to follow-up issues without holding a merge.
+- Four recurring CI failures were fixed at their cause: the KILL-after-TERM test (#1591, fixes #1571), the leak grace period (#1587), the `mktemp` name window that leaked `plot-host-*-err` files (#1595), and the corpus guards on an estate with no plan in flight (#1602).
+
+### What could improve
+
+- `main` went red at least five times from test flakes and leaks, and each red reading held every slice until a re-run or a fix landed.
+- Five release records written in parallel raced on `main`: three pushes were rejected and three redundant micro-PRs (#1598, #1599, #1601) had to be closed.
+- The release gate read a checkout four commits behind `origin/main` and reported a delivered Should Have as open (#1597).
+- The board ran a bundle one day older than `main`; `plot-boardctl.sh --stop` hung on `lsof`, and the restart left no pidfile.
+- The release pull request gets no checks of its own until a person approves the bot's CI run.
+- 24 of the 33 issues the sprint's plans name stayed open after the release, because the release record wrote no tracker status.
+
+### Action items
+
+- [ ] Make the release gate judge `origin/<default>`, or refuse when the checkout is behind (#1597).
+- [ ] Record a release one plan at a time, or make `plot-deliver.sh --release` serialise its pushes.
+- [ ] Close or carry forward the 24 open issues the released plans name.
+
+### Metrics
+
+- **Must-haves completed:** 1/1
+- **Should-haves completed:** 4/4
+- **Could-haves completed:** 0/0
+- **Deferred items:** 0
+- **Scope changes during sprint:** 0
+- **Duration:** planned 14 days, actual 3 days
 
 ## Notes
 
