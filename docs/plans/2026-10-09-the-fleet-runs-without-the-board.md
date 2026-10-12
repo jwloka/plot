@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Delivered
+- **State:** Released
 - **Type:** infra
 - **Issue:** #1407
 - **Story:** the-shell-holds-no-behavior
@@ -18,6 +18,7 @@
 - **Started:** 2026-10-10, jwloka, `feature/the-fleet-owns-its-automatic-writes`
 - **Started:** 2026-10-10, jwloka, `feature/the-controllers-are-commands`
 - **Delivered:** 2026-10-10
+- **Released:** 2026-10-10, v2.25.0
 
 ## Changelog
 
