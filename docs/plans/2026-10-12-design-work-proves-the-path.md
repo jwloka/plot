@@ -14,6 +14,7 @@
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-spike-is-approved-alone`
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-spike-can-be-dispatched`
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-slices-are-confirmed-after-the-spike`
+- **Started:** 2026-10-13, Jan Wloka, `feature/a-tracer-plan-stays-in-design`
 
 ## Changelog
 
