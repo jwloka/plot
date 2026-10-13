@@ -79,6 +79,7 @@ import { ActivityMark } from '../lib/agent-rows/marks.js';
 import { HeaderRow, IssueRowView, PlanLink, PlanRow, Row, SliceRow, RegistryRow, type AgentListProps } from '../lib/agent-rows/rows.js';
 import { workingAgentRows, brokenAgentRows, draftPlanRows } from '../lib/agent-rows/working-agents.js';
 import { DraftPlanRowView } from '../lib/agent-rows/draft-plan-row.js';
+import { PlanLevelRowView, sectionCount, verificationRows } from '../lib/agent-rows/plan-level-row.js';
 import { hasExceptions } from '../lib/agent-rows/stuck.js';
 // RE-EXPORTED, not redefined — the same allowance `splitBranch` above is given.
 // These moved out of this file when the row estate was split into three
@@ -301,6 +302,7 @@ export function AgentList({
   staleSeconds = null,
   onOpenPlan,
   cardForPlanFile,
+  planFileForSlug,
   dispatch,
   approve,
   commission,
@@ -473,6 +475,17 @@ export function AgentList({
   // hides still means the plan has one. `?? []` because the client casts the
   // fleet, and an older server sends no `draftPlans` at all.
   const draftRows = draftPlanRows(fleet?.draftPlans ?? [], fleet?.rows ?? []);
+  // THE FLEET'S OWN VERIFY RUNS — a run ON A PLAN, not on a branch. `halted`,
+  // `running` and `rows` come from `.plot/state/auto-verify-in-flight.json` as
+  // the daemon last wrote it; `null` (the file unreadable) answers no rows and
+  // no banner at all, by `verificationRows`'s own rule.
+  const { working: workingPlanRows, waiting: verificationWaitingRows, haltedLine } =
+    verificationRows(fleet?.verification ?? null);
+  // THE PLAN FILE of a plan-level row: the payload names only the slug, so the
+  // file is the `path` of the board card with that slug (`planFileForSlug`).
+  // "" before the board loads or where no card holds the slug, which
+  // `PlanLevelRowView` renders as the slug with no link.
+  const planFileOf = (slug: string): string => planFileForSlug?.(slug) ?? '';
 
   const [openSlices, setOpenSlices] = useState<Set<string>>(() => new Set());
   const sliceKey = sliceKeyOf;
@@ -1087,15 +1100,17 @@ export function AgentList({
         // agents is the tally — Done when #1, N entries → N rows — so `countOf`
         // answers the agents here and the rows everywhere else.
         const workingSection = key === 'working';
-        const waitingOnYouSection = key === 'waiting-on-you';
         // THE COUNT IS OF WHAT THE SECTION HOLDS — branches, issues and broken
-        // agents where applicable. WORKING counts its registry entries, WAITING ON
-        // YOU adds issues and broken agents to its branch rows.
-        const countOf = workingSection
-          ? workingRows.length
-          : waitingOnYouSection
-            ? rows.length + brokenRows.length + draftRows.length
-            : rows.length;
+        // agents where applicable. WORKING counts its registry entries AND the
+        // fleet's own plan-level runs; WAITING ON YOU adds issues, broken agents,
+        // draft plans and the fleet's failed verify runs to its branch rows.
+        const countOf = sectionCount(key, {
+          branches: rows.length,
+          registry: workingRows.length,
+          broken: brokenRows.length,
+          drafts: draftRows.length,
+          planLevel: { working: workingPlanRows.length, waiting: verificationWaitingRows.length },
+        });
         // The plan scope the blocked-by jump needs ABOVE the row. WORKING orders
         // by agent, so there is no per-plan `<ul>` to tag the way the grouped
         // sections have; the section's own grid carries it instead. First match
@@ -1128,6 +1143,16 @@ export function AgentList({
         // with no branch. Rendered after the issues and before the broken
         // agents — a decision outranks a problem report.
         const drafts = key === 'waiting-on-you' ? draftRows : [];
+        // THE FLEET'S OWN FAILED VERIFY RUNS, for WAITING ON YOU only — a run on
+        // a PLAN, not a branch, same non-branch shape as a draft. Rendered after
+        // the drafts and before the broken agents: a decision owed on a plan
+        // (draft or failed verification) outranks a worker problem report.
+        const verifications = key === 'waiting-on-you' ? verificationWaitingRows : [];
+        // THE FLEET-HALTED SENTENCE, for WAITING ON YOU only, and only when no
+        // row above already says so in its own `reason` — `verificationRows`
+        // itself withholds `haltedLine` in that case, so this reads the one
+        // value it already decided rather than re-deciding here.
+        const verificationHaltedLine = key === 'waiting-on-you' ? haltedLine : null;
         // Every waiting-group is grouped the same way, `done` included: it is
         // the group that grows fastest over a working day, so it is the first to
         // become a list one scrolls past. A rule with an exception for the group
@@ -1218,7 +1243,7 @@ export function AgentList({
         const unplanned = { tickets: issues.length, drafts: drafts.length, agents: broken.length };
         const tallyOf = workingSection
           ? { plans: countOf, slices: countOf, branches: 0, tickets: 0, agents: 0 }
-          : sectionTally(rows, key, slices, unplanned);
+          : sectionTally(rows, key, slices, { ...unplanned, planLevel: verifications.length });
         // EACH KIND UNDER ITS OWN NAME — and the wording is `tallyLabel`'s, not
         // this component's: a label built here could only be asserted by
         // rendering a page. One number where there is one kind and nothing
@@ -1441,6 +1466,18 @@ export function AgentList({
                 literally true because the pids still exist. Hiding them would
                 lose real processes an operator may need to stop by hand. */}
             {key === 'working' && <FleetAlert supervisor={fleet?.supervisor} />}
+            {/* THE FLEET-HALTED SENTENCE — a sibling of the heading, same
+                reason as the alert above: one fact said once, outside
+                `tupleFromPlan` and outside any row, never counted in the
+                section's own count. */}
+            {verificationHaltedLine && (
+              <p
+                data-verification-halted-line
+                className="border-t border-slate-200 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+              >
+                {verificationHaltedLine}
+              </p>
+            )}
             {/* The body goes, the header stays — including its count. Removed
                 from the tree rather than hidden with CSS: a folded group should
                 cost no vertical space at all, which is the entire complaint
@@ -1471,27 +1508,40 @@ export function AgentList({
                 // it. The five registry states each render their own word, and a
                 // merged branch's worker sits here while that branch keeps its
                 // DONE row — both true, neither moved.
-                workingRows.length > 0 ? (
-                  workingRows.map(({ agent, row }) => (
-                    <RegistryRow
-                      // One desk gives one key: `agentRowKey` decides it.
-                      key={agentRowKey(agent)}
-                      agent={agent}
-                      row={row}
-                      slices={slices}
-                      onOpenPlan={onOpenPlan}
-                      card={row ? cardForPlanFile?.(row.planFile) ?? null : null}
-                      dispatch={dispatch}
-                      implement={implement}
-                      continueWith={continueWith}
-                      pulse={pulse}
-                      onStarting={onStarting}
-                      marked={row ? marked.has(rowKey(row)) : false}
-                      active={row ? active.has(rowKey(row)) : false}
-                      onRevealBranch={onRevealBranch}
-                      highlighted={agent.branch !== '' && agent.branch === highlightBranch}
-                    />
-                  ))
+                workingRows.length > 0 || workingPlanRows.length > 0 ? (
+                  <>
+                    {workingRows.map(({ agent, row }) => (
+                      <RegistryRow
+                        // One desk gives one key: `agentRowKey` decides it.
+                        key={agentRowKey(agent)}
+                        agent={agent}
+                        row={row}
+                        slices={slices}
+                        onOpenPlan={onOpenPlan}
+                        card={row ? cardForPlanFile?.(row.planFile) ?? null : null}
+                        dispatch={dispatch}
+                        implement={implement}
+                        continueWith={continueWith}
+                        pulse={pulse}
+                        onStarting={onStarting}
+                        marked={row ? marked.has(rowKey(row)) : false}
+                        active={row ? active.has(rowKey(row)) : false}
+                        onRevealBranch={onRevealBranch}
+                        highlighted={agent.branch !== '' && agent.branch === highlightBranch}
+                      />
+                    ))}
+                    {/* THE FLEET'S OWN RUNNING VERIFY RUNS — a plan, a sentence,
+                        no branch and no registry entry: the fleet daemon runs
+                        these directly rather than through a dispatched agent. */}
+                    {workingPlanRows.map((row) => (
+                      <PlanLevelRowView
+                        key={`plan-level-${row.kind}-${row.plan}`}
+                        row={row}
+                        planFile={planFileOf(row.plan)}
+                        onOpenPlan={onOpenPlan}
+                      />
+                    ))}
+                  </>
                 ) : (
                   <li role="row" className="px-3 py-2 text-sm text-slate-400 dark:text-slate-600">
                     <span role="gridcell">none</span>
@@ -2358,10 +2408,10 @@ export function AgentList({
                 // they open the section and look for the rows. A single site
                 // would leave whichever of those two readings unlabelled.
                 // `none` is only printed where there is nothing AT ALL. A
-                // section holding issue rows or broken agent rows and no branches
-                // is not empty, and the word would sit above the rows contradicting
-                // them.
-                issues.length === 0 && broken.length === 0 && drafts.length === 0 && (
+                // section holding issue rows, broken agent rows, draft plans or
+                // plan-level rows and no branches is not empty, and the word
+                // would sit above the rows contradicting them.
+                issues.length === 0 && broken.length === 0 && drafts.length === 0 && verifications.length === 0 && (
                 <li role="row" className="px-3 py-2 text-sm text-slate-400 dark:text-slate-600">
                   <span role="gridcell">
                     {key === 'waiting-on-machine' && answer !== 'answered'
@@ -2385,6 +2435,18 @@ export function AgentList({
               ))}
               {drafts.map((draft) => (
                 <DraftPlanRowView key={`draft-${draft.plan}`} draft={draft} onOpenPlan={onOpenPlan} />
+              ))}
+              {/* THE FLEET'S OWN FAILED VERIFY RUNS — a plan, a sentence, no
+                  branch, the same non-branch shape a draft plan takes. Rendered
+                  after the drafts and before the broken agents: a decision owed
+                  on a plan outranks a worker problem report. */}
+              {verifications.map((row) => (
+                <PlanLevelRowView
+                  key={`plan-level-${row.kind}-${row.plan}`}
+                  row={row}
+                  planFile={planFileOf(row.plan)}
+                  onOpenPlan={onOpenPlan}
+                />
               ))}
               {/* THE BROKEN AGENTS — `stalled` and `unknown` — as problem reports.
                   Rendered AFTER branches and issues: actionable work outranks
