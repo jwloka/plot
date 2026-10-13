@@ -99,6 +99,7 @@ describe('a tracker is asked apart from the git host', () => {
       // is the op answering honestly rather than a field left unset.
       status: '',
       statusCategory: '',
+      closedAt: null,
     });
 
     const keyed = scriptsThat({
@@ -116,7 +117,10 @@ describe('a tracker is asked apart from the git host', () => {
     // worth a plan?* must not read it as an empty problem statement.
     const bare = scriptsThat({ 'plot-host.sh': "echo '{}'" });
     expect(answer<readonly Issue[]>(await trackerGithub(bare).issueList())).toEqual([
-      { id: '', title: '', url: '', createdAt: null, body: null, status: '', statusCategory: '' },
+      {
+        id: '', title: '', url: '', createdAt: null, body: null, status: '', statusCategory: '',
+        closedAt: null,
+      },
     ]);
 
     const empty = scriptsThat({
@@ -163,7 +167,7 @@ describe('a tracker is asked apart from the git host', () => {
     });
     const issue = answer<readonly Issue[]>(await trackerJira(rich).issueList())[0];
     expect(Object.keys(issue).sort()).toEqual([
-      'body', 'createdAt', 'id', 'status', 'statusCategory', 'title', 'url',
+      'body', 'closedAt', 'createdAt', 'id', 'status', 'statusCategory', 'title', 'url',
     ]);
   });
 
@@ -178,6 +182,16 @@ describe('a tracker is asked apart from the git host', () => {
     expect(await trackerGithub(broke).issueView('7')).not.toEqual(
       await trackerGithub(cannot).issueView('7'),
     );
+  });
+
+  it('carries the sentence an exit 4 states, without the script prefix, on every read', async () => {
+    const said = scriptsThat({ 'plot-host.sh': "echo 'plot-host: bitbucket has no issue listing' >&2; exit 4" });
+    const tracker = trackerGithub(said);
+    const expected = { ok: false, why: 'unaskable', reason: 'bitbucket has no issue listing' };
+    expect(await tracker.issueList()).toEqual(expected);
+    expect(await tracker.issueView('7')).toEqual(expected);
+    expect(await tracker.limit()).toEqual(expected);
+    expect(tracker.lastRefusal()).toBeNull();
   });
 
   it('tells an empty inbox apart from both refusals', async () => {
@@ -440,9 +454,14 @@ describe('a repository with no tracker writes nowhere and says so', () => {
 
   it('never reaches a script, whatever it was asked', async () => {
     // The measurable form of *writes nowhere*: no connector, no process, no
-    // config read. `trackerNone` takes no context at all, so there is nothing
-    // it could spawn.
-    expect(trackerNone.length).toBe(0);
+    // config read. `trackerNone` takes at most a reason string and no context,
+    // so there is nothing it could spawn.
+    expect(trackerNone.length).toBeLessThanOrEqual(1);
+    expect(await trackerNone('why').issueListClosed('2026-01-01T00:00:00Z', 10)).toEqual({
+      ok: false,
+      why: 'unaskable',
+      reason: 'why',
+    });
   });
 });
 
@@ -485,6 +504,7 @@ describe('the fixture stands in for a tracker that is there', () => {
     body: null,
     status: 'open',
     statusCategory: 'To Do',
+    closedAt: null,
   };
 
   it('answers every read the port defines', async () => {

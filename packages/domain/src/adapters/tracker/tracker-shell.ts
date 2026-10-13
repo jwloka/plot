@@ -1,7 +1,8 @@
 import type { Issue } from '../../entities/issue.js';
 import type { TrackerSpender } from '../../ports/tracker.js';
 import { LimitBasisSchema, type LimitBasis, type LimitReading } from '../../entities/limit.js';
-import { answered, type PortResult } from '../../port-result.js';
+import type { ClosedIssues } from '../../ports/tracker.js';
+import { answered, unaskable, type PortResult } from '../../port-result.js';
 import { asJson, asJsonLines, resultOf, runProcess, type ScriptRun } from '../run-script.js';
 import { scriptPath, type ShellContext } from '../scripts.js';
 
@@ -14,6 +15,8 @@ interface RawIssue {
   body?: string;
   status?: string;
   statusCategory?: string;
+  closedAt?: string;
+  nextPageToken?: string;
 }
 
 /** One limit reading as `plot-host.sh` reports it. */
@@ -52,7 +55,56 @@ export const issueOf = (raw: RawIssue): Issue => ({
   body: raw.body ?? null,
   status: raw.status ?? '',
   statusCategory: raw.statusCategory ?? '',
+  closedAt: raw.closedAt !== undefined && raw.closedAt !== '' ? raw.closedAt : null,
 });
+
+/**
+ * Splits one `issue-list` page into its issues and the next page's token.
+ *
+ * The script prints the token as a last JSON line, `{"nextPageToken":"…"}`,
+ * which has no `number`. Every other line is an issue.
+ *
+ * @param stdout - the script's output for one page.
+ * @returns the page's issues, and the token of the next page, or null on the last.
+ */
+export const pageOf = (stdout: string): { issues: Issue[]; next: string | null } => {
+  const lines = asJsonLines<RawIssue>(stdout);
+  const token = lines.find((line) => line.nextPageToken !== undefined)?.nextPageToken;
+  return {
+    issues: lines.filter((line) => line.nextPageToken === undefined).map(issueOf),
+    next: token === undefined || token === '' ? null : token,
+  };
+};
+
+/** The prefix `plot-host.sh` puts on every line it writes to stderr. */
+const SCRIPT_PREFIX = /^plot-host: /;
+
+/**
+ * Reads the reason an exit-4 run stated on stderr.
+ *
+ * @param stderr - the script's stderr.
+ * @returns the trimmed text without the `plot-host: ` prefix, or undefined when it is empty.
+ */
+export const unaskableReasonOf = (stderr: string): string | undefined =>
+  stderr.trim().replace(SCRIPT_PREFIX, '') || undefined;
+
+/**
+ * Milliseconds since the epoch of an issue's `closedAt`, or -Infinity when it
+ * is absent or does not parse, so such an issue sorts last.
+ */
+const closedMs = (issue: Issue): number => {
+  const ms = issue.closedAt === null ? Number.NaN : Date.parse(issue.closedAt);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+};
+
+/**
+ * Orders closed issues newest close first.
+ *
+ * @param issues - the issues, in any order.
+ * @returns a new array; issues with no readable `closedAt` come last, in their input order.
+ */
+export const newestCloseFirst = (issues: readonly Issue[]): Issue[] =>
+  [...issues].sort((a, b) => closedMs(b) - closedMs(a) || 0);
 
 /**
  * Reads a number the script may have reported as null, absent or nonsense.
@@ -131,12 +183,16 @@ export const trackerReads = (shell: TrackerShell, env: Readonly<Record<string, s
    */
   let refusal: string | null = null;
 
+  /**
+   * Maps one run into a result and keeps its refusal. Exit 4 answers
+   * `unaskable` carrying the reason the script stated on stderr.
+   */
   const record = <T>(script: ScriptRun, parse: (stdout: string) => T): PortResult<T> => {
     refusal =
       script.code === 0 || script.code === 4
         ? null
         : script.stderr.trim() || script.stdout.trim() || `plot-host.sh exited ${script.code}`;
-    return resultOf(script, parse);
+    return script.code === 4 ? unaskable(unaskableReasonOf(script.stderr)) : resultOf(script, parse);
   };
 
   const ask = async <T>(args: readonly string[], parse: (stdout: string) => T) =>
@@ -145,8 +201,46 @@ export const trackerReads = (shell: TrackerShell, env: Readonly<Record<string, s
   return {
     issueList: (limit?: number): Promise<PortResult<readonly Issue[]>> =>
       ask(['issue-list', ...(limit === undefined ? [] : ['--limit', String(limit)])], (stdout) =>
-        asJsonLines<RawIssue>(stdout).map(issueOf),
+        pageOf(stdout).issues,
       ),
+
+    /**
+     * Lists the issues closed at or after `since`, walking the script's pages.
+     *
+     * One script call reads one page and holds no loop: the script prints the
+     * next page's token as a last line, and this passes it back as
+     * `--page-token`. A script that prints none (GitHub pages inside its one
+     * process) is read once. The read stops at `limit` rows and reports
+     * `complete: false` there; it also stops, incomplete, when a page makes no
+     * progress, so a tracker repeating its token cannot loop it. The rows are
+     * sorted by `closedAt` after the last page, because no tracker search
+     * promises that order: GitHub ignores a close-date sort.
+     *
+     * Exit 4 answers `unaskable` carrying the script's stated reason. Any page
+     * that fails fails the whole read, because rows from the pages before it
+     * would pass for the end of the list.
+     *
+     * @param since - the earliest closing time to include, ISO-8601.
+     * @param limit - how many issues to read at most.
+     * @returns the closed issues, newest first, and whether the read reached its end.
+     */
+    issueListClosed: async (since: string, limit: number): Promise<PortResult<ClosedIssues>> => {
+      const issues: Issue[] = [];
+      let token: string | null = null;
+      const seen = new Set<string>();
+      while (issues.length < limit) {
+        const args = ['issue-list', '--state', 'closed', '--since', since, '--limit', String(limit - issues.length)];
+        if (token !== null) args.push('--page-token', token);
+        const page = record(await runProcess('bash', [host, ...args], run), (stdout) => pageOf(stdout));
+        if (!page.ok) return page;
+        issues.push(...page.value.issues);
+        token = page.value.next;
+        if (token === null || page.value.issues.length === 0 || seen.has(token)) break;
+        seen.add(token);
+      }
+      const reachedEnd = token === null && issues.length < limit;
+      return answered({ issues: newestCloseFirst(issues).slice(0, limit), complete: reachedEnd });
+    },
 
     issueView: (id: string): Promise<PortResult<Issue>> =>
       ask(['issue-view', id], (stdout) => issueOf(asJson<RawIssue>(stdout))),
