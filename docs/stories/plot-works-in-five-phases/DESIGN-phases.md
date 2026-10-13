@@ -13,7 +13,7 @@ The phases of a team's workflow are configuration. Plot knows plan states, story
 
 > **Story:** [Plot works in five phases](STORY-plot-works-in-five-phases.md)
 >
-> **Decisions:** every decision in this spec is one of the thirty that jwloka made on 2026-10-12, numbered as in the story's Decisions table (D1 to D30). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
+> **Decisions:** every decision in this spec is one of the thirty-four that jwloka made on 2026-10-12 and 2026-10-13, numbered as in the story's Decisions table (D1 to D34). A detail that no decision settles is marked *proposed* and listed in the story's Open Points.
 
 ## Contents
 
