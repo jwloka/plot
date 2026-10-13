@@ -1,67 +1,167 @@
 ## Implementation brief — tickets-and-stories-have-lanes (wave: The lanes)
 
-- **Plan (canonical):** docs/plans/2026-10-12-tickets-and-stories-have-lanes.md on main
+- **Plan (canonical):** `docs/plans/2026-10-12-tickets-and-stories-have-lanes.md` on main
 - **Approved:** 2026-10-12, Jan Wloka, plan-PR #1608 merged
 - **Branch:** `feature/tickets-and-stories-have-lanes` (base: `main`)
-- **Ends as:** one PR to `main`
-- **Review of the code:** pr
+- **Ends as:** one PR to main
+- **Review of the code:** repo convention (CI green + review)
 
-This is the last wave of the plan. `feature/the-fleet-indexes-issues` (#1647), `feature/the-tracker-lists-closed-issues` (#1653), `feature/the-board-reads-archived-stories` and `feature/the-index-holds-closed-issues` (#1657) are all merged, and the branch this slice waited on, `feature/the-tabs-are-discovery-planning-delivery` (#1651), merged 2026-10-13. Nothing blocks this slice. `feature/the-lanes-read-the-whole-jira-project` is the one sibling wave still open after this one and touches only the Jira adapter's query-building, not these files.
+This is the fourth wave. Every branch it needs is merged: the spike
+`feature/the-fleet-indexes-issues` (#1647, *The issue gate*), `feature/the-tracker-lists-closed-issues`
+(#1653, *The readings*) and `feature/the-index-holds-closed-issues` (#1657, *The issue index*) are
+all on `main` as of `6e457a7d2`. The plan's D29 holds on this branch are gone — approval already
+cleared them, and the spike met its Acceptance in CI. Its sibling in the same wave,
+`feature/the-board-reads-archived-stories`, has no PR yet but `archivedStories` already rides the
+board payload (`board.ts:2374`, `:2464`) — read it, don't rebuild it. The next wave,
+`feature/the-lanes-read-the-whole-jira-project`, waits on this one merging.
 
 ### What to build
 
-Every lower-level piece this slice depends on already exists on `main`: `trackerForIssues`, `Tracker.issueListClosed`, the `issue-index.ts` entity, `Issue.closedAt`, and `archivedStories` on the board payload (`board.ts:2374`/`:2464`). What does **not** exist yet is the domain rules and the UI that turn those readings into lanes. Confirmed by direct search on `main` at this session's start: no `packages/domain/src/rules/ticket-lane.ts`, no `story-lane.ts`, and `packages/board/src/server/fleet.ts:1546`'s `refreshIssues` still calls `hostSaid(['issue-list', ...])` directly instead of `trackerForIssues(...).issueList(...)` — so the board-side tracker-resolver wiring the plan's Motivation describes as already done is this slice's job, not a given.
+Today `StoriesTab.tsx` groups stories into Draft/Active/Done/Archived with a local `COLUMN_OF`
+lookup (`:31-38`), and the board makes no distinction between tickets at all — there is no ticket
+lane, no `/api/issues/closed` route, and the Discovery tab shows only the story board. Everything
+the fold needs already exists: `tracker.issueListClosed`, `ISSUE_INDEX_OPEN_LIMIT`,
+`ISSUE_INDEX_CLOSED_DAYS` and the closed rows on `issues.json` (`issue-index.ts`, `fleet.ts:1581-1636`).
+This slice is the first one that reads any of it from a UI.
 
-Build, per the plan's Design (`docs/plans/2026-10-12-tickets-and-stories-have-lanes.md:124-170`):
+Build, in the domain:
 
-1. `packages/domain/src/rules/ticket-lane.ts` — `ticketLane(issue, reading, now)` answering `open | in-progress | done | hidden`, per the table at plan line 126-135, and `doneTickets(rows, expanded)` with `DONE_LANE_LIMIT = 20`.
-2. `packages/domain/src/rules/story-lane.ts` — `storyLane(standing, location)` and `storyLanes(map, stories)`, per the table at plan line 143-148.
-3. Board payload wiring: the lanes' open/closed rows on `/api/board` (at most 1000 each, no bodies); `GET /api/issues/closed` calling `trackerForIssues(...).issueListClosed(null, 1000)`, gated on the issue gate's `requests`/`nextAt`/`backoffUntil` — from `issues.json` under a fleet, from new `issueNextAt`/`issueRequests`/`issueBackoffUntil` fields on `CacheEntry` with no fleet (these fields do not exist on `CacheEntry` today — grep confirmed).
-4. `refreshIssues` (`fleet.ts:1546`) switches from `hostSaid(['issue-list', ...])` to `trackerForIssues(...).issueList(...)`, matching the route the already-merged spike built for the index writer.
-5. Discovery tab UI: tag cloud on top, then the tickets lane group and the stories lane group as separate groups, the Done lane's *show all done (\<n\> more)* link (view-local state, not URL), and the `?archived=1` toggle.
-6. Remove the empty-Discovery redirect in `App.tsx` — the effect at `App.tsx:1011-1021` (`if (board.stories.length === 0) setTab('planning')`) — because a Discovery tab with ticket lanes is never empty just for holding no story.
+- `ticketLane(issue, reading, now)` in `packages/domain/src/rules/ticket-lane.ts` — `open` /
+  `in-progress` / `done` / `hidden`, per the plan's table (Design § *The ticket lane*, plan lines
+  124-137). `reading` carries `categoryStated` (true only for a Jira source — GitHub and Bitbucket
+  derive a category from the state asked for, and `ticketLane` must ignore that derived value) and
+  `namedByPlan` (from `referencedIssues`, `fleet.ts:1430`; `null` when plans can't be read).
+- `doneTickets(rows, expanded)` in the same file — newest-`closedAt`-first, nulls last, the top
+  `DONE_LANE_LIMIT = 20` plus the count of the rest.
+- `storyLane(standing, location)` and `storyLanes(map, stories)` in
+  `packages/domain/src/rules/story-lane.ts` — D7's four lanes (Draft/Active/Done/Archived), restricted
+  to lanes a `PhaseMap` (`phaseOfStory`, `workflow-phases.ts:167`) declares or that hold a story. This
+  replaces `COLUMN_OF`: move the lookup out of the component into the domain, keyed on
+  `derivedStanding` (`transitions/story.ts:397`, already read at `board.ts:1695`), which answers
+  `done` for the undeclared standing `archived` too.
+
+Wire it in `fleet.ts` / the board payload: add `ticketLane`/`storyLanes` fields the Discovery tab can
+render directly, and a `GET /api/issues/closed` route in `packages/board/src/server/index.ts` beside
+the other raw `url.pathname === '/api/...'` checks (this router has no Express) that calls
+`trackerForIssues(...).issueListClosed(null, 1000)`.
+
+Render the Discovery tab: tag cloud on top (unchanged), then the tickets lane group and the stories
+lane group as separate groups, one `?archived=1` toggle (off by default) that adds the Archived story
+lane and the rest of Done. Remove the empty-state redirect at `App.tsx:1010-1021` — a Discovery tab
+with ticket lanes is never empty just because `board.stories.length === 0`.
 
 ### The decisions the plan settles — do not re-derive them
 
-**`?archived=1` is a new, separate parameter — do not reuse `?lanes=1` or `?released=1`.** `App.tsx` already has an unrelated `lanes` toggle (line 143-144, 643-647) that controls the Swimlanes *board layout* view, not this feature. Two different toggles are both named "lanes" in conversation but are unconnected: this plan's ticket/story lane groups on the Discovery tab are a fixed layout with no toggle of their own, and the toggle this slice adds only reveals the Archived story lane plus every closed ticket. The Planning tab's `?released=1` (*Show released*) stays a wholly separate control — sharing it with this toggle would conflate D7's and D8's two concerns, per the plan's explicit call-out (line 152). Pick a parameter name that cannot be confused with either existing one; the plan names `?archived=1`.
+**`categoryStated` is true only for Jira — never derive "in progress" from a GitHub/Bitbucket state.**
+GitHub and Bitbucket arms derive a category from the state they asked for
+(`plot-host.sh:4730-4736`), and D7 places those trackers under "no category" on purpose. `ticketLane`
+must ignore that derived value entirely — an open GitHub issue a plan names reads In progress through
+`namedByPlan`, not through any category GitHub supplied. A unit test for this exact case is in
+Acceptance (plan line 246): "an open GitHub issue named by a plan reads In progress although its
+derived category is `To Do`."
 
-**`ticketLane` ignores every derived category except Jira's.** GitHub and Bitbucket arms derive a `statusCategory` (`plot-host.sh:4730-4736`), but D7 places those two trackers under "no category" — `reading.categoryStated` is true only for the `jira` source. Building the lane from the derived category on GitHub/Bitbucket is the naive implementation the Acceptance test at plan line 176 and 246 exists to catch: "an open GitHub issue named by a plan reads In progress although its derived category is `To Do`."
+**A stated-`Done` ticket with no `closedAt` is `hidden`, not `done`.** This is the WONTFIX case: Jira
+can resolve a ticket without recording a resolution date. `hidden` means absent from the lanes until
+the toggle is on, at which point it joins Done. Don't fold it into `done` directly — the hidden state
+is what lets the toggle add it later without a second lookup.
 
-**`namedByPlan` can be `null`, and that is not the same as `false`.** It comes from `referencedIssues` (`fleet.ts:1430`), which already answers `null` when plans cannot be read — confirmed still true in the current `refreshIssues` body. On `null`, the ticket lane group shows *plans could not be read* and keeps its last good lanes (the same rule `refreshIssues` already follows for PR failures at `fleet.ts:1567-1574`); it does not fall back to treating every ticket as `namedByPlan: false`, which would silently misplace tickets into Open that should be In progress.
+**`namedByPlan: null` is a distinct state from `false`, and it wins over everything.** When
+`referencedIssues` can't read the plans directory, the whole ticket lane group shows *plans could not
+be read* and keeps its last good lanes (plan line 137, mirroring `fleet.ts:1567-1574`'s existing
+pattern for the inbox). Don't collapse `null` into `false` — a `null` silently reading as "not named"
+would misclassify every ticket a plan names as merely Open.
 
-**The derived story standing `archived` is read as `done`, not as a seventh `StoryStanding`.** `transitions/story.ts:397`'s `derivedStanding` can answer `archived` (every plan of the story released), but `StoryStatus`/`StoryStanding` entities do not declare it as a status — confirmed no such entry exists in `entities/story.ts`. `storyLane` and the phase-map lookup both read `archived` as `done`. Archived-the-**lane** is strictly about file location (`<Story directory>/archived/`, read via the already-merged `archivedStories` payload list), not about standing — a live, un-archived story with `status: done` is Done, never Archived, because only physical directory location decides the Archived lane.
+**`doneTickets`' ordering puts a null `closedAt` last, not first or by insertion order.** This matters
+because a `hidden` ticket (no `closedAt`) only becomes visible through the toggle, and when it does it
+must not jump to the top of Done ahead of genuinely recent closures.
 
-**`storyLanes` restricts drawn lanes by what the phase map declares or what a story occupies — ticket lanes are not restricted this way.** D12's declared-map-driven grouping (`phaseOfStory`, from `the-phases-are-declared`) applies only to story lanes. Open/In progress/Done for tickets are fixed, not map-driven — do not generalize the map mechanism across both rule files; the plan explicitly separates them (line 141, "ticket lanes stay outside the map, because D12 maps plan states and story statuses only" — resolved Open Point at line 182).
+**The Done lane shows 20 rows with a count, never all of them inline (D24).** On this repository
+that's 20 of 154. The *show all done (<n> more)* link's expansion state is per-view, not kept in the
+URL — only `?archived=1` is a URL parameter. Don't add a second query param for Done's expansion.
 
-**The toggle's closed-ticket read is on-demand, not on the periodic poll.** `GET /api/issues/closed` is called once when the toggle turns on and once on a page load with `?archived=1` already set — never on the board's 30 s/4 s polls. It reuses the issue gate's own `requests`/`nextAt`/`backoffUntil` for its own rate limiting (reading from `issues.json` under a fleet, or the new `CacheEntry` fields with none) so it never exceeds 30 requests/hour even while kept on continuously. Wiring it into the periodic refresh instead is the mistake the Acceptance test at plan line 196/234 exists to catch.
+**`?archived=1` is the Discovery tab's own toggle — never share `?released=1`.** `App.tsx:633-638`
+preserves every query parameter across tab switches, so if Discovery's toggle reused the Planning
+tab's `?released=1`, turning on one would turn on the other. They must stay two separate parameters
+even though both default off and both add an "everything" view.
 
-**Rules carried over unchanged:** `unaskable`/`failed`/`nobody` stay three distinct outcomes a lane group must render distinctly — a `nobody`, `unaskable` or `failed` answer with no kept rows reaches the lanes as `issueAbsence` text, never as three silently-empty lane groups (plan line 110). Absence is a state to show, not a state to hide.
+**`/api/issues/closed` is request-driven, never polled.** The tab calls it once when the toggle turns
+on and once on a page load with `?archived=1` already set — never on the existing 30 s `/api/board`
+poll. The endpoint keeps its last answer for `max(issueIntervalMs(requests), issueIntervalMs(p))`
+where `requests`/`backoffUntil` come from `issues.json` under a fleet or `CacheEntry` without one
+(both already plumbed into `PrWorld.issueGate` by the issue-index slice) — a second request inside
+that window must hit no `plot-host.sh` command at all, and a request during an active `backoffUntil`
+asks nothing and serves the backoff's reason. This endpoint is new to this slice; the budget reads it
+depends on already exist.
+
+**The empty-Discovery redirect is removed outright, not special-cased.** `App.tsx:1010-1021` sends an
+empty-of-stories Discovery tab to Planning. After this slice a Discovery tab with zero stories still
+shows ticket lanes, so the condition that triggered the redirect (`board.stories.length === 0`) is no
+longer a valid proxy for "nothing to show here." Delete the effect; don't add a second condition to it.
+
+**Every lane decision is a domain property with its own unit test — nothing decided in the `.tsx`.**
+This repo's binding rule (`CLAUDE.md` *Every rendered state is a domain property*): a decision made in
+a component can only be tested by rendering it, and this repo's 42-of-43 browser-test history is the
+cost of that mistake. One test per row of the ticket table and the story table (plan line 246) is the
+acceptance bar, not a suggestion.
 
 ### Done when
 
-The plan's `## Acceptance` "The plan" section (docs/plans/2026-10-12-tickets-and-stories-have-lanes.md:238-256) is the specification for this slice (ignore "The spike" subsection above it — already merged and judged on its own PR). Assertions worth calling out because a naive implementation passes without them:
+The plan's `## Acceptance` "The plan" section (lines 238-256) is the specification — every bullet
+there is a test, not prose. The ones a naive pass would miss:
 
-- `doneTickets` over 25 Done rows answers the 20 newest and a count of 5 — catches an off-by-one or a count that includes the shown rows.
-- `storyLanes` over a map declaring no `story:paused` and no paused story returns Draft *without* `paused` as a key, but over `DEFAULT_PHASE_MAP` returns Draft, Active and Done — catches a lane list that is always the full three regardless of what the map actually declares.
-- A ticket that closes and then reopens leaves Done and returns to Open or In progress on the next pass — catches a `hidden`/`done` state treated as sticky instead of recomputed each pass.
-- A failed pass keeps the previous rows and `at`, and the lanes draw them under a failure line — catches a failure that clears the lane instead of showing stale-but-present data.
-- `PR_REQUESTS_PER_REFRESH` keeps reading `github: 1`/`bitbucket: 3` and the PR pass's stretch does not rise when only the issue fold spends — catches double-counting the issue read's cost against the PR budget.
-- The Discovery toggle writes and reads `?archived=1` and *no other* parameter — catches a toggle handler that also clears or sets `tab`/`highlight`/etc.
+- The GitHub-named-ticket-reads-In-progress case above, specifically because its *derived* category
+  says `To Do` — this is the one row that looks wrong if you trust the tracker's own category.
+- `doneTickets` over 25 rows answers 20 + a count of 5 (not 25, not 20 with no count).
+- `storyLanes` over a map with no `story:paused` declared and no paused story returns Draft without a
+  `paused` lane — i.e., an empty lane the map doesn't mention is omitted, not rendered blank.
+- A story with derived standing `archived` reads Done under a map that lists statuses without
+  `story:*` at all — the fallback path when the map is silent on archival.
+- `/api/fleet` must still carry **no closed issue**, capped at 50 inbox rows as today — this slice
+  only adds the closed read to `/api/board` and the new `/api/issues/closed` route, never to the 4 s
+  poll.
+- A story under `<Story directory>/archived/` shows in Archived with `?archived=1` set, and is still
+  absent from the Planning tab's own story filter (`board.ts:1746`, `:1758`) — the two filters must
+  not interfere with each other.
 
-Plus: the repo's gates — build artifacts, changeset, platform constraints. For tests, run `node skills/plot/scripts/board/plot-local-checks.mjs` before each push and run what it prints; the suites in `CLAUDE.md`'s `CI suites` key run in CI, not here. List no full suite.
+Plus the repo's gates: a changeset (`'plot': patch` or appropriate bump — this is new UI surface, so
+consider `minor` on `@plot-pm/board` for the lanes, `patch` on `plot` if any skill doc needs a line),
+and this branch adds no new shell. Run
+`node skills/plot/scripts/board/plot-local-checks.mjs` before each push and run what it prints — the
+related `packages/domain` and `packages/board` vitest/tsc suites will fire on `rules/ticket-lane.ts`,
+`rules/story-lane.ts` and the board's server/app changes. The suites under `CI suites` run in CI only;
+a failure there comes back as a correction, not something to chase locally.
 
-`scripts/check-shell-lines.sh` refuses a PR whose shell under `skills/` grows past its merge base — the plan's own cost table (line 160-168) estimates this slice's net shell-line change at 0 (TypeScript and React only), so no `.sh` file should need touching; if one does, pay for it in the same change.
-
-A changeset is needed: `plot` or `@plot-pm/board` package, per `CLAUDE.md`'s versioning section — minor, since this adds a new board-visible section (lane groups) rather than fixing a bug.
+`scripts/check-shell-lines.sh` refuses a PR that grows the shipped shell under `skills/`. This slice
+is pure TypeScript/TSX (domain rules, `fleet.ts`, `index.ts`, `App.tsx`, `StoriesTab.tsx`) — it should
+add zero shell lines. If anything here ends up touching a `.sh` file, that growth must be paid for in
+the same change.
 
 ### Bookkeeping
 
-Open the PR through the controller once a branch exists: `skills/plot/scripts/plot-open-pr.sh` (or `--draft` while still moving). Do not run `gh pr create` directly. When the PR is created, append `→ #<number>` to this branch's line under `docs/plans/2026-10-12-tickets-and-stories-have-lanes.md`'s `### The lanes` heading, and set the PR to "Ready" on the project board if one is configured (none is configured on this repo's `## Plot Config`, so this step is a no-op here). Push the first real commit as soon as it exists.
+Open the PR through the controller once the branch has its first commit:
+
+```bash
+../plot/scripts/plot-open-pr.sh          # current branch
+../plot/scripts/plot-open-pr.sh --draft  # while still moving
+```
+
+Do not run `gh pr create` directly. When the PR exists, append `→ #<number>` to this branch's line
+in the plan's `## Slices` section (*The lanes* heading), and push the first real commit as soon as
+it exists rather than batching everything into one late push.
 
 ### Scope guard
 
-This branch owns: `packages/domain/src/rules/ticket-lane.ts` (new), `packages/domain/src/rules/story-lane.ts` (new), their test files, `packages/board/src/server/fleet.ts` (the `refreshIssues` tracker-routing change, `CacheEntry` issue-gate fields, the `/api/issues/closed` endpoint), `packages/board/src/server/board.ts` (payload wiring for lane rows), `packages/board/src/app/App.tsx` (the empty-Discovery redirect removal, the `?archived=1` toggle), and the Discovery tab component(s) that render the lane groups (likely a new component alongside the existing `StoriesTab.tsx`, which this slice's lane logic supersedes for Discovery but may not delete outright — check whether `StoriesTab.tsx` is still used by the Planning tab before removing it).
+This branch owns: `packages/domain/src/rules/ticket-lane.ts` (new), `packages/domain/src/rules/story-lane.ts`
+(new) and their tests; the board payload additions in `packages/board/src/server/fleet.ts` and the new
+route in `packages/board/src/server/index.ts`; `packages/board/src/app/App.tsx` (the empty-redirect
+removal and the `?archived=1` toggle) and `packages/board/src/app/components/StoriesTab.tsx` (replacing
+`COLUMN_OF` with `storyLane`/`storyLanes`, and the new tickets lane group).
 
-Other branches in flight, verified at brief-writing time: `feature/the-lanes-read-the-whole-jira-project` is the only other open slice of this plan, waiting on a sibling plan's slice (`the-delivery-tab-filters-by-sprint-and-owner` of `the-board-has-three-tabs`) and touching only `plot-host.sh`'s Jira query-building and `ports/tracker.ts` — no file overlap with this branch's scope. `feature/a-refuted-claim-opens-an-issue` (PR #1662) is open on an unrelated plan.
+Do not touch: `packages/domain/src/entities/issue-index.ts`, `packages/domain/src/adapters/tracker/*`,
+or `packages/fleet/src/shared/issue-refresh.ts` — all merged and settled by the three prior waves. The
+only sibling branch still open in this wave, `feature/the-board-reads-archived-stories`, already has
+`archivedStories` on the board payload (`board.ts:2374`); read that field, don't re-derive archived
+stories here. The next wave, `feature/the-lanes-read-the-whole-jira-project`, waits on this branch and
+touches the Jira JQL scope in `plot-host.sh` and the inbox rows — out of scope here.
 
-If you find something the plan did not anticipate, report it rather than improvising outside scope — in particular, confirm the naming collision between this slice's Archived *story* lane concept and the unrelated `?lanes=1` Swimlanes toggle does not leak into shared component or prop names.
+If you find something the plan did not anticipate, report it rather than improvising outside scope.
