@@ -14,6 +14,7 @@
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-jurors-fold-into-one-line-per-claim`
 - **Started:** 2026-10-12, Jan Wloka, `feature/a-delivered-plan-carries-its-verification`
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-fleet-verifies-a-delivered-plan`
+- **Started:** 2026-10-13, Jan Wloka, `feature/a-tracker-opens-an-issue`
 
 ## Changelog
 
