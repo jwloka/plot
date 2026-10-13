@@ -11,6 +11,7 @@
 - **Rounds:** 3
 - **Impl:** own branches
 - **Approved:** 2026-10-13, jwloka, plan-PR #1608 merged
+- **Started:** 2026-10-13, Jan Wloka, `feature/the-tabs-are-discovery-planning-delivery`
 
 ## Changelog
 
