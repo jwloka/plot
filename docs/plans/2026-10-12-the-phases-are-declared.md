@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
@@ -14,6 +14,7 @@
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-board-draws-the-declared-phases`
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-idea-asks-about-design`
 - **Started:** 2026-10-12, Jan Wloka, `feature/a-draft-can-need-design`
+- **Delivered:** 2026-10-13
 
 ## Changelog
 
