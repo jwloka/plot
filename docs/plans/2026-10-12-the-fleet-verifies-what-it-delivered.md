@@ -222,7 +222,7 @@ The fleet fills no sign-off line, as `/plot-release` already forbids an agent (`
 
 ### The checklist
 
-- `feature/the-fleet-keeps-the-release-checklist` — `docs/releases/vnext-checklist.md` in the record's commit while it has no `RC:` line; `/plot-release rc` adds the RC line in place; the final `/plot-release` renames it to `v<version>-checklist.md`; `/plot-release` with no argument reads `vnext-checklist.md` as an RC checklist only with an `RC:` line (`:191`); `/plot-release` lists refuted and unverified plans before step 1 and names `/plot-reject` <!-- builds: the fleet-kept release checklist -->
+- `feature/the-fleet-keeps-the-release-checklist` — `docs/releases/vnext-checklist.md` in the record's commit while it has no `RC:` line; `/plot-release rc` adds the RC line in place; the final `/plot-release` renames it to `v<version>-checklist.md`; `/plot-release` with no argument reads `vnext-checklist.md` as an RC checklist only with an `RC:` line (`:191`); `/plot-release` lists refuted and unverified plans before step 1 and names `/plot-reject` <!-- builds: the fleet-kept release checklist --> → #1667
 
 ## Acceptance
 
