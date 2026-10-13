@@ -14,6 +14,7 @@
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-fleet-indexes-issues`
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-board-reads-archived-stories`
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-index-holds-closed-issues`
+- **Started:** 2026-10-13, Jan Wloka, `feature/tickets-and-stories-have-lanes`
 
 ## Changelog
 
