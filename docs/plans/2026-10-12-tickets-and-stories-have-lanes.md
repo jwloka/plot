@@ -268,7 +268,7 @@ The GitHub closed read reuses the open arm's `gh_state` (`:4730`) and adds no ar
 
 ### The issue index
 
-- `feature/the-index-holds-closed-issues` — the fold reads every open issue up to `ISSUE_INDEX_OPEN_LIMIT` and the closed issues of 14 days into `closed`; the board's no-fleet `refreshIssues` calls `trackerForIssues` in place of `hostSaid` on its own gate, with `issueNextAt`, `issueRequests` and `issueBackoffUntil` on `CacheEntry` and the no-fleet `PrWorld.issueGate`; `PR_REQUESTS_PER_REFRESH` with `github: 1` and `bitbucket: 3` and their comments; the jira row and `:57` of `DESIGN-index.md` <!-- builds: closed issues in the issue index and the board's no-fleet issue gate -->
+- `feature/the-index-holds-closed-issues` → #1657 — the fold reads every open issue up to `ISSUE_INDEX_OPEN_LIMIT` and the closed issues of 14 days into `closed`; the board's no-fleet `refreshIssues` calls `trackerForIssues` in place of `hostSaid` on its own gate, with `issueNextAt`, `issueRequests` and `issueBackoffUntil` on `CacheEntry` and the no-fleet `PrWorld.issueGate`; `PR_REQUESTS_PER_REFRESH` with `github: 1` and `bitbucket: 3` and their comments; the jira row and `:57` of `DESIGN-index.md` <!-- builds: closed issues in the issue index and the board's no-fleet issue gate -->
 
 ### The lanes
 
