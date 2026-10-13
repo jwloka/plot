@@ -10,7 +10,8 @@ import { recordCommitOf } from '../src/adapters/refs/refs-git.js';
 import { claimsOf, renderClaims } from '../src/rules/claims.js';
 import { fencedLines } from '../src/rules/fences.js';
 import { jurorPath, moderationPath } from '../src/rules/panel.js';
-import { foldVerification, verificationBody, verifiedValue } from '../src/rules/verification.js';
+import { foldVerification, refutedIssue, verificationBody, verifiedValue } from '../src/rules/verification.js';
+import { refutedClaims } from '../src/rules/verification-record.js';
 import { withRecord, withSection } from '../src/workflows/rendering.js';
 
 const PLAN = `# P
@@ -260,5 +261,50 @@ describe('the plan-section write', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('verificationBody with issue notes', () => {
+  const fold = foldVerification(['one', 'two'], [{ lens: 'a', text: 'Claim-1: refuted\nClaim-2: refuted\n' }]);
+  if (fold.fold !== 'record') throw new Error('expected a record');
+
+  it('ends a refuted line in the issue number or the reason, and leaves a claim with no note alone', () => {
+    const notes = new Map([['one', { issue: '1712' }], ['two', { noIssue: 'no Tracker declared;\nread-only — here' }]]);
+    expect(verificationBody(fold.verdicts, notes)).toBe(
+      '- Claim-1 refuted — one — a refuted — #1712\n- Claim-2 refuted — two — a refuted — no issue: no Tracker declared; read-only - here\n',
+    );
+    expect(verificationBody(fold.verdicts, new Map([['one', { issue: '7' }]]))).toContain('- Claim-2 refuted — two — a refuted\n');
+  });
+
+  it('names the plan, the claim and the lenses in the issue it opens', () => {
+    const issue = refutedIssue('p', fold.verdicts[0]!, 'abcdef0123');
+    expect(issue.title).toBe('Refuted claim of p: one');
+    expect(issue.body).toContain('Claim-1');
+    expect(issue.body).toContain('abcdef0');
+  });
+
+  it('shortens a long claim in the title and names the supporting lenses in the body', () => {
+    const long = 'x'.repeat(100);
+    const mixed = foldVerification([long], [
+      { lens: 'a', text: 'Claim-1: refuted\n' },
+      { lens: 'b', text: 'Claim-1: supported\n' },
+    ]);
+    if (mixed.fold !== 'record') throw new Error('expected a record');
+    const issue = refutedIssue('p', mixed.verdicts[0]!, 'abcdef0123');
+    expect(issue.title).toBe(`Refuted claim of p: ${'x'.repeat(79)}…`);
+    expect(issue.body).toContain('Refuted by a; b supported.');
+    expect(issue.body).toContain(`> ${long}`);
+  });
+
+  it.each([
+    ['1712', '#1712'],
+    ['PROJ-12', 'PROJ-12'],
+  ])('round-trips the id %s through the line reader', (id, rendered) => {
+    const body = verificationBody(fold.verdicts, new Map([['one', { issue: id }], ['two', { noIssue: 'a — b' }]]));
+    expect(body).toContain(`— a refuted — ${rendered}\n`);
+    expect(refutedClaims(`# P\n\n## Verification\n\n${body}`)).toEqual([
+      { n: 1, claim: 'one', issue: id, noIssue: null },
+      { n: 2, claim: 'two', issue: null, noIssue: 'a - b' },
+    ]);
   });
 });

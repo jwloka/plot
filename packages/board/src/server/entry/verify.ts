@@ -6,15 +6,28 @@ import { planStoreShell } from '@plot-pm/domain/adapters/plan-store/plan-store-s
 import { scriptsShell } from '@plot-pm/domain/adapters/scripts/scripts-shell';
 import { treesGit } from '@plot-pm/domain/adapters/trees/trees-git';
 import { runProcess } from '@plot-pm/domain/adapters/run-script';
-import type { Host, PlanStore, Refs, Scripts, Trees } from '@plot-pm/domain';
+import { trackerForIssues } from '@plot-pm/domain/adapters/tracker/tracker-resolve';
+import type { Host, PlanStore, Refs, Scripts, Tracker, Trees } from '@plot-pm/domain';
 import { claimsOf, renderClaims } from '@plot-pm/domain/rules/claims';
 import { deskRoot } from '@plot-pm/domain/rules/desk-root';
 import { archiveRound, isArchivedRound, jurorPath, moderationPath, panelDir } from '@plot-pm/domain/rules/panel';
 import {
+  ISSUE_MAY_EXIST,
+  issueSteps,
+  parseIssueState,
+  renderIssueState,
+  settleOpen,
+  type IssueEntry,
+  type IssueState,
+} from '@plot-pm/domain/rules/refuted-issues';
+import { refutedClaims, type RefutedClaim } from '@plot-pm/domain/rules/verification-record';
+import {
   foldVerification,
+  refutedIssue,
   verificationBody,
   verifiedValue,
   type ClaimVerdict,
+  type IssueNote,
 } from '@plot-pm/domain/rules/verification';
 import { withRecord, withSection } from '@plot-pm/domain/workflows/rendering';
 import { readVerifyStatus, verifyStatusLines } from '@plot-pm/fleet/shared/auto-verify';
@@ -98,7 +111,7 @@ interface RunFacts {
 }
 
 /** The ports and paths one invocation needs. */
-interface Context {
+export interface Context {
   repoRoot: string;
   scriptDir: string;
   /** `scriptDir` relative to the root of the tree that holds it. */
@@ -108,10 +121,12 @@ interface Context {
   planStore: PlanStore;
   scripts: Scripts;
   trees: Trees;
+  /** Resolves the tracker that opens issues from the declared `Tracker` key and the git host's backend. */
+  issueTracker: (declared: string, backend: string) => Tracker;
 }
 
 /** What the command line asked for. */
-interface Args {
+export interface Args {
   command: 'prepare' | 'claims' | 'fold' | 'record' | 'status';
   slug: string;
   at: string;
@@ -499,6 +514,87 @@ const fold = async (ctx: Context, args: Args, write: Printer, warn: Printer): Pr
   return 0;
 };
 
+/** The file holding the issues a plan's verification opened, below the repository root. */
+const issueStatePath = (repoRoot: string, slug: string): string => path.join(repoRoot, VERIFY_DIR, `${slug}.json`);
+
+/**
+ * Reads the issue state file.
+ *
+ * @param file - the state file.
+ * @returns its entries; empty where the file is absent.
+ * @throws {Refused} when the file exists and does not parse, so nothing opens.
+ */
+const readIssueState = (file: string): IssueState => {
+  if (!existsSync(file)) return {};
+  const state = parseIssueState(readFileSync(file, 'utf8'));
+  if (state === null) {
+    throw new Refused(`${file} does not parse as an issue state file.\n  No issue was opened and nothing was written. Repair or remove the file, then re-run.`);
+  }
+  return state;
+};
+
+/**
+ * Writes the issue state file through a temporary file and a rename.
+ *
+ * @param file - the state file.
+ * @param state - the entries.
+ */
+const writeIssueState = (file: string, state: IssueState): void => {
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(`${file}.tmp`, renderIssueState(state));
+  renameSync(`${file}.tmp`, file);
+};
+
+/**
+ * Opens the issues `issueSteps` names, recording each claim in the state file
+ * before and after its call.
+ *
+ * Before each `issueOpen` the claim's entry becomes `{ pending: true }`; the
+ * answer replaces it through `settleOpen`. A run that ends between the call
+ * and the second write leaves `pending`, and no later run opens that claim
+ * until a person clears the entry, as `issueSteps` describes. `issueOpen` does
+ * not look for a duplicate, so the state file and the plan's own lines are the
+ * only guard against a second issue.
+ *
+ * @param tracker - the connector that opens the issues.
+ * @param stateFile - the issue state file.
+ * @param slug - the plan's slug.
+ * @param judged - the commit the claims were judged at.
+ * @param verdicts - what the fold answered.
+ * @param recorded - the refuted lines of the plan on the default branch.
+ * @returns the issue note per refuted claim text.
+ * @throws {Refused} when the state file exists and does not parse; nothing opens.
+ */
+export const openRefutedIssues = async (
+  tracker: Tracker,
+  stateFile: string,
+  slug: string,
+  judged: string,
+  verdicts: readonly ClaimVerdict[],
+  recorded: readonly RefutedClaim[] = [],
+): Promise<Map<string, IssueNote>> => {
+  const entries: Record<string, IssueEntry> = { ...readIssueState(stateFile) };
+  const notes = new Map<string, IssueNote>();
+  for (const step of issueSteps(verdicts, recorded, entries)) {
+    if (step.step === 'note') {
+      notes.set(step.claim, step.note);
+      continue;
+    }
+    entries[step.claim] = { pending: true };
+    writeIssueState(stateFile, entries);
+    const opened = await tracker.issueOpen({ ...refutedIssue(slug, step.verdict, judged), labels: ['ai-generated'] });
+    const answer = opened.ok
+      ? { opened: opened.value.id }
+      : { refused: (opened.why === 'unaskable' ? opened.reason : undefined) ?? tracker.lastRefusal() };
+    const settled = settleOpen(answer, tracker.config().scheme);
+    if (settled.entry === null) delete entries[step.claim];
+    else entries[step.claim] = settled.entry;
+    writeIssueState(stateFile, entries);
+    notes.set(step.claim, settled.note);
+  }
+  return notes;
+};
+
 /**
  * Books the record onto the default branch and removes every tree.
  *
@@ -508,7 +604,7 @@ const fold = async (ctx: Context, args: Args, write: Printer, warn: Printer): Pr
  * @param warn - where refusals go.
  * @returns the exit code.
  */
-const record = async (ctx: Context, args: Args, write: Printer, warn: Printer): Promise<number> => {
+export const record = async (ctx: Context, args: Args, write: Printer, warn: Printer): Promise<number> => {
   const facts = readFacts(ctx.repoRoot, args.slug);
   const verdicts = await foldRun(ctx, facts, warn);
   if (verdicts === null) return 1;
@@ -535,6 +631,23 @@ const record = async (ctx: Context, args: Args, write: Printer, warn: Printer): 
     const present = await ctx.planStore.readText(target);
     if (!present.ok || present.value === null) throw new Refused(`${facts.plan} is not present on origin/${main}`);
 
+    const declared = await ctx.scripts.config('Tracker', '');
+    const backend = await ctx.host.backend();
+    const tracker = ctx.issueTracker(declared.ok ? declared.value.trim() : '', backend.ok ? backend.value : '');
+    const notes = await openRefutedIssues(
+      tracker,
+      issueStatePath(ctx.repoRoot, args.slug),
+      args.slug,
+      facts.judged,
+      verdicts,
+      refutedClaims(present.value),
+    );
+    for (const [claim, note] of notes) {
+      if ('noIssue' in note && note.noIssue.startsWith(ISSUE_MAY_EXIST)) {
+        warn(`plot-verify: no issue opened for "${claim}": ${note.noIssue}\n  Once checked, write {"issue": "<id>"} as its entry in ${issueStatePath(ctx.repoRoot, args.slug)}, or remove the entry where no issue exists.\n`);
+      }
+    }
+
     const value = verifiedValue(
       {
         today: localDate(),
@@ -546,7 +659,7 @@ const record = async (ctx: Context, args: Args, write: Printer, warn: Printer): 
       verdicts,
     );
     const recorded = withRecord(present.value, 'Verified', value, 'replace');
-    const landed = withSection(recorded.text, 'Verification', verificationBody(verdicts));
+    const landed = withSection(recorded.text, 'Verification', verificationBody(verdicts, notes));
     const written = await ctx.planStore.writeText(target, landed);
     if (!written.ok) throw new Refused(`could not write ${facts.plan}.\n  Re-run this — it is idempotent.`);
     await ctx.trees.stage(tmpwt, [facts.plan]);
@@ -653,6 +766,7 @@ export const run = async (
     planStore: planStoreShell(context),
     scripts: scriptsShell(context),
     trees: treesGit(context),
+    issueTracker: (declared, backend) => trackerForIssues(declared, backend, context),
   };
   try {
     if (parsed.command !== 'prepare' && handsOver(ctx, parsed.slug)) {
