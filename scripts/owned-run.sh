@@ -5,8 +5,9 @@
 #
 # Wraps the whole script string of `test:contracts` and `test:board`,
 # `bounded.sh` included. It creates one root, points `TMPDIR`, `HOME`,
-# `PLOT_BUDGET_HOME` and `PLOT_PR_INDEX_HOME` inside it for the whole process
-# tree, runs the command, and removes the root whatever the exit code.
+# `PLOT_BUDGET_HOME`, `PLOT_PR_INDEX_HOME` and `PLOT_ISSUE_INDEX_HOME` inside it
+# for the whole process tree, runs the command, and removes the root whatever
+# the exit code.
 #
 # ═══════════════════════════════════════════════════════════════════════════
 # WHAT THIS FIXES
@@ -115,7 +116,7 @@ root=$(mktemp -d "${TMPDIR:-/tmp}/plot-run.XXXXXX") || {
 # stray entry has nowhere to hide. The other three are named subdirectories:
 # they are inspected by name after a failure, and `check-state-inventory.mjs`
 # reads them.
-mkdir -p "$root/home" "$root/budget" "$root/pr-index" || exit 2
+mkdir -p "$root/home" "$root/budget" "$root/pr-index" "$root/issue-index" || exit 2
 
 # PLAYWRIGHT'S BROWSERS STAY WHERE THEY ARE INSTALLED. Playwright finds them
 # under `HOME`, which moves into the root below, so every browser test would
@@ -194,11 +195,11 @@ on_signal() {
 # failure, not an empty list. `find -mindepth 1 -maxdepth 1` names each entry
 # once, whatever its type, and does not descend into it.
 #
-# The three named subdirectories are the wrapper's own and are excluded by exact
+# The four named subdirectories are the wrapper's own and are excluded by exact
 # name. Everything else in the root was created by the run.
 leak_listing() {
   find "$root" -mindepth 1 -maxdepth 1 \
-    ! -name home ! -name budget ! -name pr-index 2>/dev/null
+    ! -name home ! -name budget ! -name pr-index ! -name issue-index 2>/dev/null
 }
 
 # Prints the leak listing and the tail of any worker log, for a person reading a
@@ -244,6 +245,7 @@ TMPDIR="$root" \
 HOME="$root/home" \
 PLOT_BUDGET_HOME="$root/budget" \
 PLOT_PR_INDEX_HOME="$root/pr-index" \
+PLOT_ISSUE_INDEX_HOME="$root/issue-index" \
   "$@" &
 child_pid=$!
 wait "$child_pid"

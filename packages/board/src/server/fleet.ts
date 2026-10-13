@@ -60,7 +60,8 @@ import {
 // one would bound only itself, which is the failure the port's own comment
 // names. `slotsFile` is seamed by `PLOT_BUDGET_HOME`, which is how a test moves
 // it, exactly as `budgetFile` is.
-import { TRACKER_LISTERS } from '@plot-pm/domain/adapters';
+import { issueIndexFile, TRACKER_LISTERS } from '@plot-pm/domain/adapters';
+import type { IssueIndexStore } from '@plot-pm/domain/ports/issue-index';
 import { fleetOwnsScan } from '@plot-pm/domain/rules/scan-owner';
 import {
   applyPrMaps,
@@ -1614,6 +1615,102 @@ const overlayFor = (opts: BuildBoardOptions, entry: CacheEntry): PrIndexStore =>
   return created;
 };
 
+const issueStores = new Map<string, IssueIndexStore>();
+
+/** The issue index store for a repo root, cached so its `git rev-parse` runs once. */
+const issueStoreFor = (repoRoot: string): IssueIndexStore => {
+  const held = issueStores.get(repoRoot);
+  if (held !== undefined) return held;
+  const created = issueIndexFile({ cwd: repoRoot });
+  issueStores.set(repoRoot, created);
+  return created;
+};
+
+/**
+ * Serves the inbox from the issue index fleetd writes, and asks the host
+ * nothing.
+ *
+ * - A `nobody` source shows the source's reason; no index is read.
+ * - A missing or unreadable index shows *the fleet has left no issue index to
+ *   read*, never an empty inbox.
+ * - An index whose `source` differs from this board's own `issueSource`
+ *   reading shows no rows and names the mismatch.
+ * - An `unsupported` index shows its reason.
+ * - A `failed` index shows its kept rows under the failure line.
+ * - An answered index shows its rows minus the issues a plan names, at most
+ *   {@link ISSUE_LIMIT}.
+ */
+const readIssuesFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): Promise<void> => {
+  const declared = await scriptsFor(opts).config('Tracker', '');
+  const source = issueSource({
+    declared: declared.ok ? declared.value : '',
+    gitHost: entry.backend ?? 'github',
+    listers: TRACKER_LISTERS,
+  });
+  if (source.ask === 'nobody') {
+    entry.issues = [];
+    entry.issueAnswer = 'unsupported';
+    entry.issueError = null;
+    entry.issueAbsence = issueAbsence(source.reason);
+    return;
+  }
+  const held = await issueStoreFor(opts.repoRoot).read();
+  if (!held.ok || held.value === null) {
+    entry.issues = [];
+    entry.issueAnswer = 'unsupported';
+    entry.issueError = null;
+    entry.issueAbsence = 'Open issues are not listed: the fleet has left no issue index to read.';
+    return;
+  }
+  const index = held.value;
+  if (index.source !== source.ask) {
+    entry.issues = [];
+    entry.issueAnswer = 'failed';
+    entry.issueError =
+      `the issue index holds issues from \`${index.source}\`, and this repository reads them from \`${source.ask}\``;
+    entry.issueAbsence = null;
+    return;
+  }
+  if (index.answer === 'unsupported') {
+    entry.issues = [];
+    entry.issueAnswer = 'unsupported';
+    entry.issueError = null;
+    entry.issueAbsence = issueAbsence(index.reason ?? '');
+    return;
+  }
+  const referenced = await referencedIssues(opts);
+  if (referenced === null) {
+    entry.issueAnswer = 'failed';
+    entry.issueError = 'plans could not be read, so no issue can be called unplanned';
+    entry.issueAbsence = null;
+    return;
+  }
+  const now = Date.now();
+  entry.issues = (index.rows ?? [])
+    .filter((row) => !referenced.has(issueKey(row.number)))
+    .slice(0, ISSUE_LIMIT)
+    .map((row) => {
+      const at = row.createdAt ? Date.parse(row.createdAt) : NaN;
+      return {
+        kind: 'ticket' as const,
+        number: issueKey(row.number),
+        title: row.title,
+        url: row.url,
+        ageMinutes: Number.isNaN(at) ? null : Math.max(0, Math.round((now - at) / 60_000)),
+        status: row.status ?? '',
+        statusCategory: row.statusCategory ?? '',
+      };
+    });
+  entry.issueAbsence = null;
+  if (index.answer === 'failed') {
+    entry.issueAnswer = 'failed';
+    entry.issueError = index.reason ?? 'the issue gate failed to read open issues';
+    return;
+  }
+  entry.issueAnswer = 'answered';
+  entry.issueError = null;
+};
+
 /**
  * Whether the fleet owns the PR index: the supervisor reads `up` and the bridge
  * is fresh. The same signal as the scan's, so one fleet answers both.
@@ -1687,7 +1784,7 @@ export async function maybeRefreshPrs(opts: BuildBoardOptions, entry: CacheEntry
   try {
     if (await fleetOwnsPrs(opts, entry)) {
       await readPrsFromStore(opts, entry);
-      await refreshIssues(opts, entry);
+      await readIssuesFromStore(opts, entry);
       return;
     }
     // NO FLEET RUNS: the board asks the host itself and folds the answer in

@@ -256,3 +256,75 @@ export const refreshIntervalMs = (
   );
   return Math.round(base * stretch);
 };
+
+/** The fleet's own refresh floor for the issue gate, in milliseconds. */
+export const ISSUE_REFRESH_MS = 120_000;
+
+/** What one page of an issue list costs the gate, in milliseconds. */
+export const ISSUE_PAGE_MS = 120_000;
+
+/**
+ * How long the issue gate waits before its next pass, given what the last
+ * pass asked for.
+ *
+ * NEVER BELOW THE REFRESH FLOOR. A repository with one page of issues refreshes
+ * at the floor; a repository whose pass paged further waits exactly what that
+ * paging cost, so a large backlog is not re-asked on the same 120 s clock a
+ * small one is.
+ *
+ * @param requests - how many requests the pass spent.
+ * @returns the interval in milliseconds, never below {@link ISSUE_REFRESH_MS}.
+ */
+export const issueIntervalMs = (requests: number): number =>
+  Math.max(ISSUE_REFRESH_MS, requests * ISSUE_PAGE_MS);
+
+/**
+ * What the issue gate spends, in requests an hour, for a pass of the given cost.
+ *
+ * DERIVED FROM THE INTERVAL, NEVER WRITTEN DOWN TWICE. A pass spending
+ * `requests` waits {@link issueIntervalMs} before the next, so its hourly spend
+ * is that cost folded back over the hour — 30 requests an hour whatever the
+ * pass costs, because a heavier pass waits proportionally longer.
+ *
+ * @param requests - how many requests the pass spent.
+ * @returns the requests an hour this gate spends.
+ */
+export const issueSpendPerHour = (requests: number): number =>
+  (requests * HOUR_MS) / issueIntervalMs(requests);
+
+/**
+ * The PR pass's spend rate with the issue gate's own spend subtracted, where
+ * both spend one budget.
+ *
+ * Subtracts {@link issueSpendPerHour} of the gate's `requests` only where the
+ * gate's `connector` and `account` equal `backend` and `account`, and the
+ * gate's `nextAt` lies no more than one {@link issueIntervalMs} before `now`.
+ * Every other case returns `rate` unchanged. The result is never below 0.
+ *
+ * @param rate - the PR pass's own spend rate, or null where unread.
+ * @param gate - the issue gate's last reading, or null where there is none.
+ * @param backend - the PR pass's connector.
+ * @param account - the PR pass's account, or null where unread.
+ * @param now - epoch milliseconds.
+ * @returns `rate` with the gate's spend subtracted where it applies; `rate`
+ *   itself otherwise, including a null rate and a null `perHour`.
+ */
+export const cadenceRateOf = <T extends Pick<SpendRate, 'perHour'>>(
+  rate: T | null,
+  gate: {
+    readonly connector: string;
+    readonly account: string | null;
+    readonly requests: number;
+    readonly nextAt: number;
+  } | null,
+  backend: string,
+  account: string | null,
+  now: number,
+): T | null => {
+  if (rate === null || rate.perHour === null) return rate;
+  if (gate === null) return rate;
+  if (gate.connector !== backend || gate.account !== account) return rate;
+  const interval = issueIntervalMs(gate.requests);
+  if (gate.nextAt < now - interval) return rate;
+  return { ...rate, perHour: Math.max(0, rate.perHour - issueSpendPerHour(gate.requests)) };
+};

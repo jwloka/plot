@@ -379,12 +379,17 @@ controller  →  domain  →  port  ←  adapter  →  script / git / process
   another has TWO remote services with two accounts, two tokens and two windows
   — and asking one interface about both made a capability belonging to one
   service report *not my department* through the other. The tracker's two
-  implementations are likewise two connectors rather than one adapter with a
-  vendor branch: neither ever sees the other's credentials or budget. A
-  repository that declared no tracker gets `trackerNone`, which answers
-  `unaskable` on every operation **including the write** — a silent success
-  there would report a status reaching a tracker somebody configured while
-  nothing left the machine.
+  vendor-reaching implementations are likewise two connectors rather than one
+  adapter with a vendor branch: neither ever sees the other's credentials or
+  budget. A repository that declared no tracker and tracks issues as git-host
+  issues gets `trackerGitHost` instead, which is NOT a third connector of its
+  own — it is `trackerReads` built over the git host's EXISTING connector,
+  tagged with that connector's backend word so its `limit()` reports the
+  `host` bucket and nothing opens a second budget nothing would charge
+  against. A repository with neither a declared tracker nor a git host to read
+  from gets `trackerNone`, which answers `unaskable` on every operation
+  **including the write** — a silent success there would report a status
+  reaching a tracker somebody configured while nothing left the machine.
 
   **It stays on the adapter side of the port, with one exception that is not
   yet fixed — and the exception has moved.** `Host` names six questions and no
@@ -484,6 +489,8 @@ variant of ports-and-adapters, not a deviation from the rule above.
 **The index never says no, and this is the invariant a future consumer breaks first: the index can supply `pr: 'MERGED'` but not `pr: 'none'`.** A missing store, a missing row, a wrong-version or unparseable store, and a missing bundle all mean *ask the host*. A missing row in a `complete: false` store is not proof that no PR exists, and even a `complete: true` store knows nothing opened after its `at`. Measured 2026-08-27, an empty result read as *no PRs* refused four fully-merged plans.
 
 **One writer.** `pr-refresh.ts` is the only caller of `foldPrIndex`, and the shell consumers read and never write. A second writer beside the board races: `rename` makes each write atomic and not the read-fold-write sequence around it. Part 1 says a tool call writes the index — it does not license every script to write one.
+
+**`issues.json` is the second index fleetd writes, and only a view and the PR pass's cadence read it.** `refreshIssueIndex` in `packages/fleet/src/shared/issue-refresh.ts` is its one writer; `one-issue-index-writer.test.ts` holds that. The file lives at `.plot/state/index/issues.json` under the common git dir and carries the open issues of the source `issueSource` names, plus the issue gate's `connector`, `account`, `requests`, `nextAt` and `backoffUntil`. The board reads its *Waiting on you* rows from it while a fleet runs and makes no `issue-list` call. The PR pass reads the cadence fields: it subtracts the gate's spend from its own rate where both name one connector and account, and it asks the host nothing while the gate's `backoffUntil` lies ahead on that connector and account. No lifecycle decision reads it. A missing file shows *the fleet has left no issue index to read*, never an empty inbox.
 
 **One hold reads a non-terminal answer, and the exception is its reversibility.** `default-branch-red` reads the default branch's settled CI reading from `.plot/state/default-branch.json`, which can be `red` while the host would say `pending`; the next settled-green reading lifts the hold, and a missing, unparseable or other-version file holds nothing. **The file holds a verdict and not a bought answer**: `red` is derived from the host's runs, and it is safe to persist only because two things bound it. The next settled-green reading reverses it. And a reading whose `askedAt` — when a host last answered, which a failed ask does not move — is older than `Checks wait`, or does not parse, counts as no reading and holds nothing (`defaultBranchRed(reading, now, checksWaitMs)`), so the queue's hold ends when no host has confirmed the red within the bound, whether fleetd stopped or the host kept failing. fleetd re-asks the head at least once per half `Checks wait`, green or not, so a red main that stays red keeps its hold and a green main keeps a fresh reading. `plot-ask.mjs merge` reads the same file and refuses the other way: a merge cannot be undone, so a reading older than `Checks wait`, red or green, refuses as `default-branch-stale`, and a missing file holds nothing. While fleetd is stopped, every board-free merge refuses as stale until a fresh reading exists. The file is the one sanctioned exception to *Answers, never verdicts* below, not a precedent for another.
 
