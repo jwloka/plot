@@ -4,12 +4,13 @@
 
 ## Status
 
-- **State:** Draft
+- **State:** Approved
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
 - **Rounds:** 3
 - **Impl:** own branches
+- **Approved:** 2026-10-13, jwloka, plan-PR #1608 merged
 
 ## Changelog
 
