@@ -191,7 +191,7 @@ The removal is measured: 46 counted lines by the ratchet's own regex (`check-she
 
 ### The tracer delivery
 
-- `feature/a-tracer-plan-ships-with-its-dependent` — `planAutoDeliver` skips a tracer plan alone, returns the dependent and then its proven tracer plans, and retries a tracer plan whose dependent is delivered; each runs the single-plan `deliver` with its own receipt; `/plot-deliver` delivers a proven tracer plan with no dependent when a person runs it (D14); `bumps:` `plot-deliver: minor` and its Model Guidance row <!-- builds: tracer delivery with its first dependent -->
+- `feature/a-tracer-plan-ships-with-its-dependent` — `planAutoDeliver` skips a tracer plan alone, returns the dependent and then its proven tracer plans, and retries a tracer plan whose dependent is delivered; each runs the single-plan `deliver` with its own receipt; `/plot-deliver` delivers a proven tracer plan with no dependent when a person runs it (D14); `bumps:` `plot-deliver: minor` and its Model Guidance row <!-- builds: tracer delivery with its first dependent --> → #1648
 
 ## Acceptance
 
