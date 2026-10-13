@@ -1,3 +1,4 @@
+import type { ActiveSprintButton } from '../lib/filters.js';
 import type { FleetSprint, SprintCounts } from '../../contract/schema.js';
 
 /**
@@ -56,6 +57,13 @@ interface SprintFilterProps {
    * it showed without a membership test because they name no plan.
    */
   report?: { hidden: number; exempt: number } | null;
+  /**
+   * `activeSprintButton`'s answer for this payload's sprints — which slugs an
+   * *Active sprint* click sets, and whether there is anything to select.
+   */
+  selectAll: ActiveSprintButton;
+  /** Set the selection to `selectAll.selection` in one step. */
+  onSelectAll: () => void;
 }
 
 /**
@@ -87,7 +95,27 @@ function formatCounts(counts: SprintCounts, isEstate: boolean): string {
  * Shows estate totals when filter is OFF, sprint numbers when ON — the
  * "Compared" slice of the-sprint-filter-says-what-it-filters plan.
  */
-export function SprintFilter({ sprints, selected, onToggle, estateTotals, report = null }: SprintFilterProps) {
+export function SprintFilter({ sprints, selected, onToggle, estateTotals, report = null, selectAll, onSelectAll }: SprintFilterProps) {
+  // THE ACTIVE SPRINT BUTTON, defined once. `activeSprintButton` decides its
+  // disabled state, its title and its styling, so the rendered state is the
+  // property its unit test asserts.
+  const activeSprintButtonView = (
+    <button
+      type="button"
+      data-select-all-sprints
+      disabled={selectAll.disabled}
+      onClick={onSelectAll}
+      title={selectAll.sentence}
+      className={`ml-auto rounded border px-2 py-0.5 text-xs ${
+        selectAll.disabled
+          ? 'cursor-not-allowed border-slate-200 text-slate-400 opacity-50 dark:border-slate-700 dark:text-slate-500'
+          : 'font-medium border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
+      }`}
+    >
+      Active sprint
+    </button>
+  );
+
   // No active sprints: show disabled state with estate totals
   if (sprints.length === 0) {
     return (
@@ -104,6 +132,7 @@ export function SprintFilter({ sprints, selected, onToggle, estateTotals, report
             title="No active sprint"
           />
           <span className="italic">No active sprint</span>
+          {activeSprintButtonView}
         </div>
         {estateTotals && (
           <div className="mt-1 text-xs text-slate-400 dark:text-slate-500">
@@ -117,6 +146,9 @@ export function SprintFilter({ sprints, selected, onToggle, estateTotals, report
   // One or more active sprints: show one row per sprint
   return (
     <div data-sprint-filter className="space-y-1">
+      <div className="flex justify-end px-1">
+        {activeSprintButtonView}
+      </div>
       {sprints.map((sprint) => {
         const isSelected = selected.has(sprint.slug);
         // Show estate totals when OFF, sprint counts when ON — the effect of
