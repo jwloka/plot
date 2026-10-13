@@ -217,7 +217,7 @@ The fleet fills no sign-off line, as `/plot-release` already forbids an agent (`
 
 ### The issues
 
-- `feature/a-refuted-claim-opens-an-issue` — the verify workflow opens one `ai-generated` issue per refuted claim with no number; the numbers in `.plot/state/verify/<slug>.json` before the push; the retried push; issue numbers carried by claim text on a re-verification; the `no issue: <reason>` line <!-- builds: one issue per refuted claim -->
+- `feature/a-refuted-claim-opens-an-issue` — the verify workflow opens one `ai-generated` issue per refuted claim with no number; the numbers in `.plot/state/verify/<slug>.json` before the push; the retried push; issue numbers carried by claim text on a re-verification; the `no issue: <reason>` line <!-- builds: one issue per refuted claim --> → #1662
 
 ### The checklist
 
