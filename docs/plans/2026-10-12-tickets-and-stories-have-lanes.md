@@ -12,6 +12,7 @@
 - **Rounds:** 3
 - **Approved:** 2026-10-12, Jan Wloka, plan-PR #1608 merged
 - **Started:** 2026-10-12, Jan Wloka, `feature/the-fleet-indexes-issues`
+- **Started:** 2026-10-13, Jan Wloka, `feature/the-board-reads-archived-stories`
 
 ## Changelog
 
