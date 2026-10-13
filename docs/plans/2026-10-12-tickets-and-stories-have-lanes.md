@@ -262,7 +262,7 @@ The GitHub closed read reuses the open arm's `gh_state` (`:4730`) and adds no ar
 
 ### The readings
 
-- `feature/the-tracker-lists-closed-issues` — `plot-host.sh issue-list --state closed --since` for GitHub and Jira, exit 4 for Bitbucket; `--page-token`, `maxResults=100` and the `nextPageToken` line; the adapter's Jira page loop and the GitHub per-page budget record; the lines *The shell lines* names for this slice, net about −1; `Issue.closedAt`; `Tracker.issueListClosed` on `trackerGitHost`, `trackerGithub` and `trackerJira`; the optional `reason` on `unaskable`, filled by `trackerGitHost` and `trackerNone`; the entity text; the contract tests <!-- builds: issueListClosed, Issue.closedAt and the unaskable reason -->
+- `feature/the-tracker-lists-closed-issues` → #1653 — `plot-host.sh issue-list --state closed --since` for GitHub and Jira, exit 4 for Bitbucket; `--page-token`, `maxResults=100` and the `nextPageToken` line; the adapter's Jira page loop and the GitHub per-page budget record; the lines *The shell lines* names for this slice, net about −1; `Issue.closedAt`; `Tracker.issueListClosed` on `trackerGitHost`, `trackerGithub` and `trackerJira`; the optional `reason` on `unaskable`, filled by `trackerGitHost` and `trackerNone`; the entity text; the contract tests <!-- builds: issueListClosed, Issue.closedAt and the unaskable reason -->
 - `feature/the-board-reads-archived-stories` — the board reads `<Story directory>/archived/*/STORY-*.md` into an `archivedStories` payload list, outside the story filter <!-- builds: archivedStories on the board payload -->
 
 ### The issue index
