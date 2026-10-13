@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, readlink
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { controllerInvocation } from '@plot-pm/domain/rules/ci-suite';
+import { MANAGED_PROCESS_MARKERS, controllerInvocation } from '@plot-pm/domain/rules/ci-suite';
 import {
   carriesSpikeFlag,
   controllerRefusal,
@@ -467,10 +467,20 @@ const hostBackend = async (cwd: string, scriptDir: string): Promise<string> => {
   return backend.ok ? backend.value : '';
 };
 
-/** Whether `dir` or a directory above it holds `.plot-worker.pid`, the marker a desk holds. */
+/** Whether `dir` holds one of the markers of a managed process. */
+const holdsMarker = (dir: string): boolean => MANAGED_PROCESS_MARKERS.some((marker) => existsSync(join(dir, marker)));
+
+/**
+ * Whether `dir` or a directory above it holds `.plot-worker.pid`, the marker a
+ * desk holds, or `.plot-verify.pid`, the marker of a verification run's `pin/`.
+ *
+ * PARTIAL: this closes the `CI suites` refusal for a tree that carries the
+ * marker. Telling a verification session from an ordinary checkout at every
+ * other call site of the controller gate ships with the next plugin release.
+ */
 const underDesk = (dir: string): boolean => {
   for (let at = dir; ; at = dirname(at)) {
-    if (existsSync(join(at, '.plot-worker.pid'))) return true;
+    if (holdsMarker(at)) return true;
     if (dirname(at) === at) return false;
   }
 };
@@ -490,10 +500,10 @@ export interface ControllerReadings {
  * `ask` runs in order: the single-quoted heredoc strip; two text tests that
  * read no git — the per-word prefilter, and for an unattended agent
  * (`PLOT_UNATTENDED=1`) whether the working directory or one above it holds
- * `.plot-worker.pid`; when both answer no, the call is allowed here. Then git
- * is read once: the repository root and whether it is a linked worktree. The
- * CI-suite arm runs for an unattended agent in a linked worktree holding
- * `.plot-worker.pid`. After the prefilter: no git allows and says it went
+ * `.plot-worker.pid` or `.plot-verify.pid`; when both answer no, the call is
+ * allowed here. Then git is read once: the repository root and whether it is a
+ * linked worktree. The CI-suite arm runs for an unattended agent in a linked
+ * worktree holding `.plot-worker.pid` or `.plot-verify.pid`. After the prefilter: no git allows and says it went
  * UNVERIFIED; a linked worktree (a desk) is a worker's own call and is
  * allowed; then `controllerInvocation`, `unpinnedMerges` and the action
  * receipt, which is read and left in place. An unpinned `plot-host.sh
@@ -525,7 +535,7 @@ export const controllerGateOf = (readings: ControllerReadings): Gate => ({
     }
     const { root, linked } = where;
 
-    if (atDesk && root.ok && linked && existsSync(join(root.value, '.plot-worker.pid'))) {
+    if (atDesk && root.ok && linked && holdsMarker(root.value)) {
       try {
         const { refuse } = await import('./local-checks.js');
         let text = '';
