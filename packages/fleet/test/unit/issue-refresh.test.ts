@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { issueIndexFile } from '@plot-pm/domain/adapters';
-import { ISSUE_INDEX_VERSION, type IssueIndex } from '@plot-pm/domain';
+import { cadenceRateOf, ISSUE_INDEX_VERSION, type IssueIndex } from '@plot-pm/domain';
 import type { IssueIndexStore } from '@plot-pm/domain/ports/issue-index';
 
 import {
@@ -24,6 +24,7 @@ import { removeTree as rmTree } from '../rm-tree.mjs';
 const NOW = 1_800_000_000_000;
 const ACCOUNT = 'jwloka';
 const JIRA_ACCOUNT = 'jira:0123456789ab';
+const SINCE = new Date(NOW - 14 * 86_400_000).toISOString();
 const RATE_LIMIT = 'API rate limit exceeded for user ID 1. Please wait 300 seconds before retrying.';
 
 const dirs: string[] = [];
@@ -39,11 +40,23 @@ const issueLine = (n: number): string =>
  * A scripts directory whose `plot-host.sh` answers `spend-rate` with the
  * connector's account and `issue-list` as told, recording every call.
  */
-const fakeHost = (issueList: { rows?: number; stderr?: string; code?: number }): { dir: string; argv: () => string[] } => {
+type FakeList = { rows?: number; stderr?: string; code?: number; token?: string };
+
+const fakeHost = (
+  issueList: FakeList,
+  closed: FakeList = {},
+): { dir: string; argv: () => string[] } => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plot-issue-refresh-'));
   dirs.push(dir);
   const argvFile = path.join(dir, 'argv');
-  const rows = Array.from({ length: issueList.rows ?? 0 }, (_, i) => `printf '%s\\n' ${JSON.stringify(issueLine(i + 1))}`).join('\n');
+  const linesOf = (list: FakeList, line: (n: number) => string): string =>
+    Array.from({ length: list.rows ?? 0 }, (_, i) => `printf '%s\\n' ${JSON.stringify(line(i + 1))}`).join('\n');
+  const closedLine = (n: number): string => JSON.stringify({ ...JSON.parse(issueLine(n)), closedAt: '2026-10-12T00:00:00Z' });
+  const answer = (list: FakeList, line: (n: number) => string): string =>
+    `${linesOf(list, line)}\n`
+    + (list.token ? `  printf '%s\\n' ${JSON.stringify(JSON.stringify({ nextPageToken: list.token }))}\n` : '')
+    + (list.stderr ? `  printf '%s\\n' ${JSON.stringify(list.stderr)} >&2\n` : '')
+    + `  exit ${list.code ?? 0}\n`;
   fs.writeFileSync(
     path.join(dir, 'plot-host.sh'),
     '#!/usr/bin/env bash\n'
@@ -52,9 +65,11 @@ const fakeHost = (issueList: { rows?: number; stderr?: string; code?: number }):
     + `  if [ "$3" = jira ]; then echo '{"account":"${JIRA_ACCOUNT}"}'; else echo '{"account":"${ACCOUNT}"}'; fi\n`
     + '  exit 0\nfi\n'
     + 'if [ "$1" = issue-list ]; then\n'
-    + `${rows}\n`
-    + (issueList.stderr ? `  printf '%s\\n' ${JSON.stringify(issueList.stderr)} >&2\n` : '')
-    + `  exit ${issueList.code ?? 0}\nfi\nexit 0\n`,
+    + '  case " $* " in *" --state closed "*)\n'
+    + answer(closed, closedLine)
+    + '  ;; esac\n'
+    + answer(issueList, issueLine)
+    + 'fi\nexit 0\n',
   );
   fs.chmodSync(path.join(dir, 'plot-host.sh'), 0o755);
   const argv = (): string[] =>
@@ -111,8 +126,8 @@ const heldIndex = (over: Partial<IssueIndex> = {}): IssueIndex => ({
 });
 
 describe('one issue pass (Acceptance 2)', () => {
-  it('writes connector github, the account, requests 1, nextAt 120 s on and backoffUntil null', async () => {
-    const { dir, argv } = fakeHost({ rows: 1 });
+  it('writes connector github, the account, requests 2, nextAt 240 s on and backoffUntil null', async () => {
+    const { dir, argv } = fakeHost({ rows: 1 }, { rows: 1 });
     const store = issueIndexFile({ home: storeHome() });
     const state = freshIssueState();
 
@@ -123,24 +138,47 @@ describe('one issue pass (Acceptance 2)', () => {
       source: 'git-host',
       connector: 'github',
       account: ACCOUNT,
-      requests: 1,
-      nextAt: NOW + 120_000,
+      requests: 2,
+      nextAt: NOW + 240_000,
       backoffUntil: null,
       at: new Date(NOW).toISOString(),
       answer: 'answered',
       rows: [{ number: '1', title: 'issue 1', url: 'https://example.invalid/1', createdAt: '2026-10-01T00:00:00Z' }],
       complete: true,
+      closed: {
+        since: SINCE,
+        at: new Date(NOW).toISOString(),
+        answer: 'answered',
+        rows: [{
+          number: '1', title: 'issue 1', url: 'https://example.invalid/1',
+          createdAt: '2026-10-01T00:00:00Z', closedAt: '2026-10-12T00:00:00Z',
+        }],
+        complete: true,
+      },
     });
-    expect(argv()).toEqual(['spend-rate --connector github', 'issue-list --limit 50']);
-    expect(state).toEqual({ issueNextAt: NOW + 120_000, issueNextIsBackoff: false, issueError: null });
+    expect(argv()).toEqual([
+      'spend-rate --connector github',
+      'issue-list --paged --limit 1000',
+      `issue-list --state closed --since ${SINCE} --limit 1000`,
+    ]);
+    expect(state).toEqual({ issueNextAt: NOW + 240_000, issueNextIsBackoff: false, issueError: null });
   });
 
-  it('asks for 50 rows and writes complete false where 50 came back (M2)', async () => {
+  it('asks for 1000 open rows and writes complete true where fewer came back', async () => {
     const { dir } = fakeHost({ rows: 50 });
     const store = issueIndexFile({ home: storeHome() });
     await refreshIssueIndex(worldOf(dir, store), freshIssueState());
     const index = await onDisk(store);
     expect(index?.rows).toHaveLength(50);
+    expect(index?.complete).toBe(true);
+  });
+
+  it('writes complete false where the open read came back at its 1000-row cap (M2)', async () => {
+    const { dir } = fakeHost({ rows: 1000 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    const index = await onDisk(store);
+    expect(index?.rows).toHaveLength(1000);
     expect(index?.complete).toBe(false);
   });
 
@@ -182,7 +220,7 @@ describe('the issue pass and the PR pass backoff (Acceptance 5)', () => {
       }),
       freshIssueState(),
     );
-    expect(argv()).toContain('issue-list --limit 50');
+    expect(argv()).toContain('issue-list --paged --limit 1000');
     expect((await onDisk(store))?.answer).toBe('answered');
   });
 
@@ -193,7 +231,7 @@ describe('the issue pass and the PR pass backoff (Acceptance 5)', () => {
       worldOf(dir, store, { prBackoff: () => ({ connector: 'github', account: 'someone-else', until: NOW + 300_000 }) }),
       freshIssueState(),
     );
-    expect(argv()).toContain('issue-list --limit 50');
+    expect(argv()).toContain('issue-list --paged --limit 1000');
   });
 
   it('runs once the PR state\'s backoff has passed', async () => {
@@ -203,7 +241,154 @@ describe('the issue pass and the PR pass backoff (Acceptance 5)', () => {
       worldOf(dir, store, { prBackoff: () => ({ connector: 'github', account: ACCOUNT, until: NOW }) }),
       freshIssueState(),
     );
-    expect(argv()).toContain('issue-list --limit 50');
+    expect(argv()).toContain('issue-list --paged --limit 1000');
+  });
+});
+
+describe('the closed set of the index', () => {
+  const closedOf = async (store: IssueIndexStore) => (await onDisk(store))?.closed;
+
+  it('replaces the closed rows whole, so a reopened ticket leaves closed and joins the open rows', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { rows: 0 });
+    const store = issueIndexFile({ home: storeHome() });
+    await store.write(heldIndex({
+      closed: { since: SINCE, at: '2026-10-13T09:58:00.000Z', answer: 'answered', rows: [{ number: '1', title: 'one', url: 'u1' }], complete: true },
+    }));
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    const index = await onDisk(store);
+    expect(index?.rows?.map((row) => row.number)).toEqual(['1']);
+    expect(index?.closed?.rows).toEqual([]);
+  });
+
+  it('keeps the previous closed rows and at where only the closed read fails, and refreshes the open rows', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { stderr: 'dial tcp: lookup api.github.com: no such host', code: 1 });
+    const store = issueIndexFile({ home: storeHome() });
+    const kept = { since: '2026-09-01T00:00:00.000Z', at: '2026-10-13T09:58:00.000Z', answer: 'answered' as const, rows: [{ number: '9', title: 'nine', url: 'u9' }], complete: true };
+    await store.write(heldIndex({ closed: kept }));
+    const state = freshIssueState();
+    await refreshIssueIndex(worldOf(dir, store), state);
+    const index = await onDisk(store);
+    expect(index?.answer).toBe('answered');
+    expect(index?.at).toBe(new Date(NOW).toISOString());
+    expect(index?.rows).toHaveLength(1);
+    expect(await closedOf(store)).toEqual({
+      since: kept.since,
+      at: kept.at,
+      answer: 'failed',
+      failedAt: new Date(NOW).toISOString(),
+      reason: 'dial tcp: lookup api.github.com: no such host',
+      rows: kept.rows,
+      complete: true,
+    });
+    expect(state.issueError).toBe('dial tcp: lookup api.github.com: no such host');
+    expect(index?.backoffUntil).toBeNull();
+  });
+
+  it('records a closed rate limit as the index backoff and keeps the open rows answered', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { stderr: RATE_LIMIT, code: 1 });
+    const store = issueIndexFile({ home: storeHome() });
+    const state = freshIssueState();
+    await refreshIssueIndex(worldOf(dir, store), state);
+    const index = await onDisk(store);
+    expect(index?.answer).toBe('answered');
+    expect(index?.backoffUntil).toBe(NOW + 300_000);
+    expect(index?.closed?.answer).toBe('failed');
+    expect(state.issueNextAt).toBe(NOW + 300_000);
+    expect(state.issueNextIsBackoff).toBe(true);
+  });
+
+  it('keeps the previous closed block where the open read fails', async () => {
+    const { dir, argv } = fakeHost({ stderr: 'boom', code: 1 });
+    const store = issueIndexFile({ home: storeHome() });
+    const closed = { since: SINCE, at: '2026-10-13T09:58:00.000Z', answer: 'answered' as const, rows: [], complete: true };
+    await store.write(heldIndex({ closed }));
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    expect(await closedOf(store)).toEqual(closed);
+    expect(argv().some((call) => call.includes('--state closed'))).toBe(false);
+  });
+
+  it('spends one request where the tracker answers unaskable for the closed read', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { stderr: 'bb lists no closed date', code: 4 });
+    const store = issueIndexFile({ home: storeHome() });
+    const state = freshIssueState();
+    await refreshIssueIndex(worldOf(dir, store), state);
+    const index = await onDisk(store);
+    expect(index?.requests).toBe(1);
+    expect(index?.nextAt).toBe(NOW + 120_000);
+    expect(index?.closed?.answer).toBe('unsupported');
+    expect(index?.closed?.rows).toBeUndefined();
+    expect(index?.answer).toBe('answered');
+  });
+});
+
+describe('the requests a pass spent (D28)', () => {
+  it('counts 2 open pages and 1 closed request for 150 open and 0 closed rows: requests 3, nextAt 360 s on', async () => {
+    const { dir } = fakeHost({ rows: 150 }, { rows: 0 });
+    const store = issueIndexFile({ home: storeHome() });
+    const state = freshIssueState();
+    await refreshIssueIndex(worldOf(dir, store), state);
+    const index = await onDisk(store);
+    expect(index?.requests).toBe(3);
+    expect(index?.nextAt).toBe(NOW + 360_000);
+    expect(state.issueNextAt).toBe(NOW + 360_000);
+  });
+
+  it('counts 10 + 10 pages for 1000 open and 1000 closed rows: requests 20, nextAt 2400 s on', async () => {
+    const { dir } = fakeHost({ rows: 1000 }, { rows: 1000 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    const index = await onDisk(store);
+    expect(index?.requests).toBe(20);
+    expect(index?.nextAt).toBe(NOW + 2_400_000);
+    expect(index?.complete).toBe(false);
+    expect(index?.closed?.complete).toBe(false);
+  });
+
+  it('hands cadenceRateOf a reading whose subtraction is the spend the pass really made', async () => {
+    const { dir } = fakeHost({ rows: 150 }, { rows: 0 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    const gate = await issueGateOf(store)();
+    expect(gate).not.toBeNull();
+    // 3 requests every 360 s is 30 an hour, the bound the subtraction assumes.
+    expect((gate!.requests * 3_600_000) / (gate!.nextAt - NOW)).toBe(30);
+    expect(cadenceRateOf({ perHour: 100 }, gate, 'github', ACCOUNT, NOW + 1_000)).toEqual({ perHour: 70 });
+  });
+
+  it('counts each page of a paged open read, and reports a repeated token as incomplete (M1)', async () => {
+    const { dir, argv } = fakeHost({ rows: 1, token: 'same' }, { rows: 0 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store, { declaredTracker: 'jira https://x.invalid' }), freshIssueState());
+    const index = await onDisk(store);
+    expect(argv().filter((call) => call.startsWith('issue-list --paged'))).toEqual([
+      'issue-list --paged --limit 1000',
+      'issue-list --paged --limit 999 --page-token same',
+    ]);
+    expect(index?.complete).toBe(false);
+    expect(index?.requests).toBe(3);
+  });
+});
+
+describe('a closed read that never answered (L1)', () => {
+  it('records no at and the asked since where a first closed read fails', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { stderr: 'boom', code: 1 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    expect((await onDisk(store))?.closed).toEqual({
+      since: SINCE,
+      answer: 'failed',
+      failedAt: new Date(NOW).toISOString(),
+      reason: 'boom',
+    });
+  });
+
+  it('records no at where the first closed read is unsupported', async () => {
+    const { dir } = fakeHost({ rows: 1 }, { stderr: 'bb lists no closed date', code: 4 });
+    const store = issueIndexFile({ home: storeHome() });
+    await refreshIssueIndex(worldOf(dir, store), freshIssueState());
+    const closed = (await onDisk(store))?.closed;
+    expect(closed?.answer).toBe('unsupported');
+    expect(closed && 'at' in closed).toBe(false);
   });
 });
 

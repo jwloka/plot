@@ -40,9 +40,12 @@ function scripts(tracker: string, exitCode: number, stderr = ''): string {
   return dir;
 }
 
+/** The `issue-list` calls only: the tracker's `spend-rate` read is a separate, local question. */
 const hostCalls = (dir: string): string[] => {
   const file = path.join(dir, 'host.calls');
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n') : [];
+  return fs.existsSync(file)
+    ? fs.readFileSync(file, 'utf8').trim().split('\n').filter((call) => call.startsWith('issue-list'))
+    : [];
 };
 
 describe('the issue poll asks the source the domain names', () => {
@@ -68,7 +71,7 @@ describe('the issue poll asks the source the domain names', () => {
 
     await refreshIssues({ repoRoot: dir, scriptsDir: dir }, entry);
 
-    expect(hostCalls(dir)).toEqual(['issue-list --limit 50']);
+    expect(hostCalls(dir)).toEqual(['issue-list --paged --limit 1000']);
     expect(entry.issueAnswer).toBe('unsupported');
     expect(entry.issueError).toBeNull();
     expect(entry.issueAbsence).toMatch(/^Open issues are not listed: bb 1\.9\.0 lists no issue command/);
@@ -83,8 +86,42 @@ describe('the issue poll asks the source the domain names', () => {
 
     await refreshIssues({ repoRoot: dir, scriptsDir: dir }, entry);
 
-    expect(hostCalls(dir)).toHaveLength(1);
+    expect(hostCalls(dir)).toEqual([
+      'issue-list --paged --limit 1000',
+      expect.stringMatching(/^issue-list --state closed --since \S+ --limit 1000$/),
+    ]);
     expect(entry.issueAnswer).toBe('answered');
     expect(entry.issueAbsence).toBeNull();
+  });
+});
+
+describe('the no-fleet issue read keeps its own gate in memory', () => {
+  it('stamps the connector, requests and next due time, and writes no file under .plot/state', async () => {
+    const dir = scripts('', 0);
+    const entry = freshCacheEntry();
+    const before = Date.now();
+
+    await refreshIssues({ repoRoot: dir, scriptsDir: dir }, entry);
+
+    expect(entry.issueConnector).toBe('github');
+    // One open page and one closed page.
+    expect(entry.issueRequests).toBe(2);
+    expect(entry.issueBackoffUntil).toBeNull();
+    expect(entry.issueNextIsBackoff).toBe(false);
+    expect(entry.issueNextAt).toBeGreaterThanOrEqual(before + 240_000);
+    expect(fs.existsSync(path.join(dir, '.plot'))).toBe(false);
+  });
+
+  it('records a rate limit as the issue gate backoff', async () => {
+    const dir = scripts('', 1, 'API rate limit exceeded. Please wait 300 seconds before retrying.');
+    const entry = freshCacheEntry();
+    const before = Date.now();
+
+    await refreshIssues({ repoRoot: dir, scriptsDir: dir }, entry);
+
+    expect(entry.issueAnswer).toBe('failed');
+    expect(entry.issueNextIsBackoff).toBe(true);
+    expect(entry.issueBackoffUntil).toBeGreaterThanOrEqual(before + 300_000);
+    expect(entry.issueNextAt).toBe(entry.issueBackoffUntil);
   });
 });

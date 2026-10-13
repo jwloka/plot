@@ -11,8 +11,19 @@ import { z } from 'zod';
  */
 export const ISSUE_INDEX_VERSION = 1;
 
-/** How many open issues one issue pass asks for: one page, as the board asked before the index existed. */
-export const ISSUE_LIST_LIMIT = 50;
+/**
+ * Rows in one page of an issue read, as `plot-host.sh` names it
+ * (`ISSUE_PAGE_ROWS`): Jira's `maxResults` on a paged read, and the rows `gh`
+ * fetches per request inside its one process. A read of N rows spends at least
+ * `ceil(N / ISSUE_PAGE_ROWS)` requests.
+ */
+export const ISSUE_PAGE_ROWS = 100;
+
+/** How many open issues the index folds: the cap of the open read, above which `complete` is false. */
+export const ISSUE_INDEX_OPEN_LIMIT = 1000;
+
+/** How far back the index keeps closed issues, in days. */
+export const ISSUE_INDEX_CLOSED_DAYS = 14;
 
 /**
  * One open issue as the store holds it — exactly what the tracker answered,
@@ -35,6 +46,8 @@ export const IssueIndexRowSchema = z
     status: z.string().optional(),
     /** The stable three-value vocabulary; absent where the tracker's word has no mapping. */
     statusCategory: z.string().optional(),
+    /** When the tracker says it was closed, ISO-8601; absent on an open issue and where it gave none. */
+    closedAt: z.string().optional(),
   })
   .strict();
 
@@ -49,6 +62,36 @@ export const IssueIndexAnswerSchema = z.union([
   z.literal('unsupported'),
   z.literal('failed'),
 ]);
+
+/**
+ * The closed issues of the last {@link ISSUE_INDEX_CLOSED_DAYS} days, read on
+ * their own answer.
+ *
+ * `answer` and `failedAt` track the closed read alone: a failed closed read
+ * keeps the previous `since`, `rows`, `complete` and `at` and leaves the open
+ * read's rows untouched. `at` moves only on an answered closed read, and is
+ * absent where no closed read has answered.
+ */
+export const IssueIndexClosedSchema = z
+  .object({
+    /** The earliest closing time the read asked for, ISO-8601. */
+    since: z.string(),
+    /** When the closed read last answered, ISO-8601; absent where none has answered. */
+    at: z.string().optional(),
+    /** The closed read's own outcome. */
+    answer: IssueIndexAnswerSchema,
+    /** When the closed read last answered anything but `answered`; absent otherwise. */
+    failedAt: z.string().optional(),
+    /** Why the closed read did not answer `answered`; absent otherwise. */
+    reason: z.string().optional(),
+    /** The closed issues kept from the last answered closed read, newest close first. */
+    rows: z.array(IssueIndexRowSchema).optional(),
+    /** Whether `rows` holds every issue closed since `since` or stopped at the read's limit. */
+    complete: z.boolean().optional(),
+  })
+  .strict();
+
+export type IssueIndexClosed = z.infer<typeof IssueIndexClosedSchema>;
 
 /**
  * What one repository's issue store holds: the open issues the issue gate last
@@ -67,6 +110,9 @@ export const IssueIndexAnswerSchema = z.union([
  * A failed pass keeps the previous `rows`, `complete` and `at`, and writes
  * `failedAt` and `reason`. `rows` and `complete` are absent where no pass has
  * answered yet.
+ *
+ * `closed` is optional: a file written before the closed read existed decodes
+ * with it absent, which a reader takes as "not read".
  */
 export const IssueIndexSchema = z
   .object({
@@ -96,6 +142,8 @@ export const IssueIndexSchema = z
     rows: z.array(IssueIndexRowSchema).optional(),
     /** Whether `rows` holds every open issue or stopped at the read's own limit. */
     complete: z.boolean().optional(),
+    /** The closed issues of the last 14 days, under their own answer; absent where never read. */
+    closed: IssueIndexClosedSchema.optional(),
   })
   .strict();
 

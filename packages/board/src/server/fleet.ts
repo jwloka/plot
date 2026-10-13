@@ -49,7 +49,11 @@ import {
   type SupervisorRun,
   handedTo,
   issueAbsence,
+  issueIntervalMs,
   issueSource,
+  ISSUE_INDEX_OPEN_LIMIT,
+  type IssueIndex,
+  type IssueIndexRow,
   draftPlacement,
   prRowPlacement,
   prChecksSuppressedByMerge,
@@ -60,7 +64,7 @@ import {
 // one would bound only itself, which is the failure the port's own comment
 // names. `slotsFile` is seamed by `PLOT_BUDGET_HOME`, which is how a test moves
 // it, exactly as `budgetFile` is.
-import { issueIndexFile, TRACKER_LISTERS } from '@plot-pm/domain/adapters';
+import { issueIndexFile, TRACKER_LISTERS, trackerForIssues } from '@plot-pm/domain/adapters';
 import type { IssueIndexStore } from '@plot-pm/domain/ports/issue-index';
 import { fleetOwnsScan } from '@plot-pm/domain/rules/scan-owner';
 import {
@@ -82,6 +86,7 @@ import {
   type PrWorld,
 } from '@plot-pm/fleet/shared/pr-refresh';
 import type { PrIndexStore } from '@plot-pm/domain/ports/pr-index';
+import { closedOutcomeOf, closedSince, issueIndexRowOf } from '@plot-pm/fleet/shared/issue-refresh';
 // The PR reader moved to the fleet package; these names stay importable from
 // here because the board's tests and its payload assembly read them.
 export {
@@ -755,7 +760,34 @@ export interface CacheEntry {
   stopped: boolean;
   running: boolean;
   prRunning: boolean;
+  /**
+   * Epoch ms the no-fleet issue read is next due. 0 so the first read runs at
+   * once. In memory only: the board with no fleet writes no issue index.
+   */
+  issueNextAt: number;
+  /** Whether `issueNextAt` is a backoff the tracker's refusal named, held with no slack. */
+  issueNextIsBackoff: boolean;
+  /** How many requests the last no-fleet issue read spent; 0 before the first. */
+  issueRequests: number;
+  /** Epoch ms the tracker's named backoff ends, or null where there is none. */
+  issueBackoffUntil: number | null;
+  /** The connector the last no-fleet issue read asked, or null before the first. */
+  issueConnector: string | null;
+  /** The account that connector's budget is keyed by, or null where unread. */
+  issueAccount: string | null;
+  /**
+   * The open and closed issues the last read left, unfiltered, in the issue
+   * index's own shape: the open set's `answer`, `at`, `rows` and `complete`,
+   * and `closed` under its own answer. With no fleet, `refreshIssues` writes
+   * it from its own read; with a fleet, the board copies it from the issue
+   * index. Null before the first read, and where the read source is `nobody`
+   * or the index holds another source.
+   */
+  issueSets: IssueSets | null;
 }
+
+/** The two issue sets one read leaves, in the issue index's own shape. */
+export type IssueSets = Pick<IssueIndex, 'answer' | 'at' | 'failedAt' | 'reason' | 'rows' | 'complete' | 'closed'>;
 
 const caches = new Map<string, CacheEntry>();
 
@@ -1459,64 +1491,52 @@ async function referencedIssues(opts: BuildBoardOptions): Promise<Set<string> | 
   return referenced;
 }
 
-/** One open issue the no-fleet inbox reads from an `issue-list` line. */
-export interface OpenIssueLine {
-  number: string;
-  title: string;
-  url: string;
-  createdAt: string;
-  status: string;
-  statusCategory: string;
-}
-
 /**
- * Reads `plot-host.sh issue-list` output as the no-fleet inbox's open issues.
+ * The inbox rows of a set of open issues: those no plan references, at most
+ * {@link ISSUE_LIMIT}, in the order given.
  *
- * A line that does not parse, or that carries no `number`, is skipped. A
- * pagination line such as `{"nextPageToken":"…"}` has no `number`, and an
- * issue built from it would carry the key `undefined`.
- *
- * @param raw - the script's stdout, one JSON object per line.
- * @returns the issues, in the order the script printed them.
+ * @param rows - the open issues, unfiltered.
+ * @param referenced - the issue keys the plans name.
+ * @param now - epoch ms the ages are measured from.
+ * @returns the board's issue rows.
  */
-export const openIssuesOf = (raw: string): OpenIssueLine[] => {
-  const open: OpenIssueLine[] = [];
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const issue = JSON.parse(line) as {
-        number?: string | number; title?: string; url?: string; createdAt?: string;
-        status?: string; statusCategory?: string;
+const inboxOf = (rows: readonly IssueIndexRow[], referenced: ReadonlySet<string>, now: number) =>
+  rows
+    .filter((row) => !referenced.has(issueKey(row.number)))
+    .slice(0, ISSUE_LIMIT)
+    .map((row) => {
+      const at = row.createdAt ? Date.parse(row.createdAt) : NaN;
+      return {
+        // A ticket, stated rather than left to the consumer's call site — see
+        // `IssueRowSchema.kind`. Every one of the seven kinds arrives the same
+        // way, which is what lets one row component read slot 2 from the data.
+        kind: 'ticket' as const,
+        number: issueKey(row.number),
+        title: row.title,
+        url: row.url,
+        // Null rather than 0 where the host gave no date: 0 would claim the
+        // issue was opened this instant.
+        ageMinutes: Number.isNaN(at) ? null : Math.max(0, Math.round((now - at) / 60_000)),
+        // The tracker's own word and the category it falls in — carried BOTH,
+        // because neither substitutes for the other: the name is what a person
+        // reads and the category is the stable vocabulary a board could decide
+        // on. Passed through untouched, empty included; the tracker's `''` for a
+        // state its own vocabulary has no word for is a fact, not a gap to fill.
+        status: row.status ?? '',
+        statusCategory: row.statusCategory ?? '',
       };
-      if ((typeof issue.number !== 'string' && typeof issue.number !== 'number') || issue.number === '') continue;
-      open.push({
-        number: issueKey(issue.number),
-        title: issue.title ?? '',
-        url: typeof issue.url === 'string' ? issue.url : '',
-        createdAt: typeof issue.createdAt === 'string' ? issue.createdAt : '',
-        // A CAST, NOT A PARSE — so the type guards are what stand in for one.
-        // `plot-host.sh` emits both keys on all three backends, but this is a
-        // hand-written projection reading named keys, and a key it does not
-        // name is a key the board never shows: that is precisely how the status
-        // reached the wire and stopped here. `''` where the host said nothing,
-        // which the renderer already has an answer for.
-        status: typeof issue.status === 'string' ? issue.status : '',
-        statusCategory:
-          typeof issue.statusCategory === 'string' ? issue.statusCategory : '',
-      });
-    } catch {
-      // One malformed line is not a reason to discard the rest, and not a
-      // reason to call the whole lookup failed either.
-    }
-  }
-  return open;
-};
+    });
 
 /**
- * Open tracker issues no plan references — the board's inbox.
+ * Open tracker issues no plan references — the board's inbox — read with no
+ * fleet.
  *
- * Runs on the PR timer beside `refreshPrs`, because it asks the same host at the
- * same cadence and its cost belongs to the same budget.
+ * Runs on the PR timer beside `refreshPrs`, behind its own gate
+ * (`issueNextAt`). It reads the same rows the fleet's issue pass folds: up to
+ * `ISSUE_INDEX_OPEN_LIMIT` open issues page by page, then the issues closed in
+ * the last 14 days. Both sets stay unfiltered on `entry.issueSets`, and
+ * `issueRequests` counts the pages both reads spent. The inbox filter and the
+ * {@link ISSUE_LIMIT} cap apply only to `entry.issues`.
  *
  * THE THREE OUTCOMES STAY APART, and the port is where they are decided: it
  * answers `unaskable` for a host with no issue listing at all, `failed` for an
@@ -1543,29 +1563,48 @@ export async function refreshIssues(opts: BuildBoardOptions, entry: CacheEntry):
     entry.issueAbsence = issueAbsence(source.reason);
     return;
   }
-  const said = await scriptsFor(opts).hostSaid(['issue-list', '--limit', String(ISSUE_LIMIT)]);
+  const startedAt = Date.now();
+  const stamp = new Date(startedAt).toISOString();
+  const context = { repoRoot: opts.repoRoot, scriptDir: opts.scriptsDir };
+  const gitHost = entry.backend ?? 'github';
+  const tracker = trackerForIssues(declared.ok ? declared.value : '', gitHost, context);
+  const spent = await tracker.spender();
+  const connector = spent.ok ? spent.value.connector : gitHost;
+  // Rows of another connector are not this read's to keep.
+  const kept = entry.issueConnector === connector ? entry.issueSets : null;
+  entry.issueConnector = connector;
+  entry.issueAccount = spent.ok ? spent.value.account : null;
+  entry.issueRequests = 1;
+  entry.issueNextAt = startedAt + issueIntervalMs(entry.issueRequests);
+  entry.issueNextIsBackoff = false;
+  entry.issueBackoffUntil = null;
+  const said = await tracker.issueListOpen(ISSUE_INDEX_OPEN_LIMIT);
   // `unaskable` is the adapter saying THIS HOST CANNOT BE ASKED — a standing
   // fact, not an outage: a disabled tracker, or a `bb` with no issue command.
   // It clears any stale error and empties the list, because there is nothing
   // to keep and nothing failed. The adapter read the exit code; this reads the
   // word, and keeps the adapter's sentence as the reason the board shows.
-  if (said.answer === 'unaskable') {
+  if (!said.ok && said.why === 'unaskable') {
+    const reason = tracker.lastRefusal() ?? said.reason ?? '';
     entry.issues = [];
     entry.issueAnswer = 'unsupported';
     entry.issueError = null;
-    entry.issueAbsence = issueAbsence(said.said);
+    entry.issueAbsence = issueAbsence(reason);
+    entry.issueSets = { answer: 'unsupported', at: stamp, failedAt: stamp, reason };
     return;
   }
   entry.issueAbsence = null;
-  if (said.answer === 'failed') {
-    const message = said.said;
+  if (!said.ok) {
+    const message = tracker.lastRefusal() ?? 'the issue read failed and said nothing';
     entry.issueAnswer = 'failed';
     entry.issueError = message; // `entry.issues` keeps its last good value on purpose
-    // The issue poll is the neighbour the PR refresh's backoff never reached. It
-    // runs on the SAME gate (`prNextAt`), so a rate limit HERE must push that
-    // gate out too — otherwise the poll re-fires on the ordinary cadence and
-    // spends the exhausted budget to be refused again. The wait comes from the
-    // host's own message, exactly as the PR refresh derives it.
+    // The kept rows, `complete`, `at` and closed set stay; the failure is recorded beside them.
+    entry.issueSets = { ...(kept ?? { at: stamp }), answer: 'failed', failedAt: stamp, reason: message };
+    // The issue poll is the neighbour the PR refresh's backoff never reached.
+    // A rate limit HERE must push the PR gate (`prNextAt`) out too — otherwise
+    // the PR refresh re-fires on the ordinary cadence and spends the exhausted
+    // budget to be refused again. The wait comes from the host's own message,
+    // exactly as the PR refresh derives it.
     // AWAITED because #272 gave this a second shape: where the message carries
     // no reset, it asks the host for the real one and returns a Promise. The
     // synchronous paths still return a number, so the await costs a microtask
@@ -1575,6 +1614,9 @@ export async function refreshIssues(opts: BuildBoardOptions, entry: CacheEntry):
     const backoff = waitOf(reaction);
     if (backoff !== null) {
       // Measured from NOW — the host's "wait 90 seconds" starts when it said so.
+      entry.issueBackoffUntil = Date.now() + backoff;
+      entry.issueNextAt = entry.issueBackoffUntil;
+      entry.issueNextIsBackoff = true;
       // EXTEND-ONLY: never pull the gate in. A longer backoff the PR fetch set a
       // tick earlier is a floor the host named, and this poll's own ceiling has
       // no business shortening it — the same "more conservative only" rule
@@ -1587,7 +1629,22 @@ export async function refreshIssues(opts: BuildBoardOptions, entry: CacheEntry):
     }
     return;
   }
-  const open = openIssuesOf(said.stdout);
+  // The closed read follows an answered open read, as in the fleet's pass, and
+  // fails on its own: a failed closed read keeps the earlier closed set and
+  // leaves the open rows and the inbox as the open read set them.
+  const since = closedSince(startedAt);
+  const closedRead = await tracker.issueListClosed(since, ISSUE_INDEX_OPEN_LIMIT);
+  const finishedAt = Date.now();
+  const outcome = closedOutcomeOf(closedRead, kept?.closed, since, stamp, tracker.lastRefusal(), finishedAt);
+  entry.issueRequests = said.value.pages + outcome.spent;
+  entry.issueNextAt = startedAt + issueIntervalMs(entry.issueRequests);
+  if (outcome.wait !== null) {
+    entry.issueBackoffUntil = finishedAt + outcome.wait;
+    entry.issueNextAt = entry.issueBackoffUntil;
+    entry.issueNextIsBackoff = true;
+  }
+  const rows = said.value.issues.map(issueIndexRowOf);
+  entry.issueSets = { answer: 'answered', at: stamp, rows, complete: said.value.complete, closed: outcome.closed };
   const referenced = await referencedIssues(opts);
   if (referenced === null) {
     // The plans could not be read, so "which of these is unplanned" has no
@@ -1597,31 +1654,7 @@ export async function refreshIssues(opts: BuildBoardOptions, entry: CacheEntry):
     entry.issueError = 'plans could not be read, so no issue can be called unplanned';
     return;
   }
-  const now = Date.now();
-  entry.issues = open
-    .filter((i) => !referenced.has(issueKey(i.number)))
-    .map((i) => {
-      const at = i.createdAt ? Date.parse(i.createdAt) : NaN;
-      return {
-        // A ticket, stated rather than left to the consumer's call site — see
-        // `IssueRowSchema.kind`. Every one of the seven kinds arrives the same
-        // way, which is what lets one row component read slot 2 from the data.
-        kind: 'ticket' as const,
-        number: i.number,
-        title: i.title,
-        url: i.url,
-        // Null rather than 0 where the host gave no date: 0 would claim the
-        // issue was opened this instant.
-        ageMinutes: Number.isNaN(at) ? null : Math.max(0, Math.round((now - at) / 60_000)),
-        // The tracker's own word and the category it falls in — carried BOTH,
-        // because neither substitutes for the other: the name is what a person
-        // reads and the category is the stable vocabulary a board could decide
-        // on. Passed through untouched, empty included; the tracker's `''` for a
-        // state its own vocabulary has no word for is a fact, not a gap to fill.
-        status: i.status,
-        statusCategory: i.statusCategory,
-      };
-    });
+  entry.issues = inboxOf(rows, referenced, Date.now());
   entry.issueAnswer = 'answered';
   entry.issueError = null;
 }
@@ -1638,6 +1671,17 @@ const overlayFor = (opts: BuildBoardOptions, entry: CacheEntry): PrIndexStore =>
 };
 
 const issueStores = new Map<string, IssueIndexStore>();
+
+/** The two issue sets an issue index holds, without its cadence fields. */
+const setsOf = (index: IssueIndex): IssueSets => ({
+  answer: index.answer,
+  at: index.at,
+  ...(index.failedAt === undefined ? {} : { failedAt: index.failedAt }),
+  ...(index.reason === undefined ? {} : { reason: index.reason }),
+  ...(index.rows === undefined ? {} : { rows: index.rows }),
+  ...(index.complete === undefined ? {} : { complete: index.complete }),
+  ...(index.closed === undefined ? {} : { closed: index.closed }),
+});
 
 /** The issue index store for a repo root, cached so its `git rev-parse` runs once. */
 const issueStoreFor = (repoRoot: string): IssueIndexStore => {
@@ -1674,6 +1718,7 @@ const readIssuesFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): 
     entry.issueAnswer = 'unsupported';
     entry.issueError = null;
     entry.issueAbsence = issueAbsence(source.reason);
+    entry.issueSets = null;
     return;
   }
   const held = await issueStoreFor(opts.repoRoot).read();
@@ -1685,6 +1730,7 @@ const readIssuesFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): 
     return;
   }
   const index = held.value;
+  entry.issueSets = index.source === source.ask ? setsOf(index) : null;
   if (index.source !== source.ask) {
     entry.issues = [];
     entry.issueAnswer = 'failed';
@@ -1707,22 +1753,7 @@ const readIssuesFromStore = async (opts: BuildBoardOptions, entry: CacheEntry): 
     entry.issueAbsence = null;
     return;
   }
-  const now = Date.now();
-  entry.issues = (index.rows ?? [])
-    .filter((row) => !referenced.has(issueKey(row.number)))
-    .slice(0, ISSUE_LIMIT)
-    .map((row) => {
-      const at = row.createdAt ? Date.parse(row.createdAt) : NaN;
-      return {
-        kind: 'ticket' as const,
-        number: issueKey(row.number),
-        title: row.title,
-        url: row.url,
-        ageMinutes: Number.isNaN(at) ? null : Math.max(0, Math.round((now - at) / 60_000)),
-        status: row.status ?? '',
-        statusCategory: row.statusCategory ?? '',
-      };
-    });
+  entry.issues = inboxOf(index.rows ?? [], referenced, Date.now());
   entry.issueAbsence = null;
   if (index.answer === 'failed') {
     entry.issueAnswer = 'failed';
@@ -1786,6 +1817,17 @@ export const refreshPrs = async (
     host: hostFor(opts),
     store,
     afterAnswer: (open) => refreshRuns(opts, entry, open, build),
+    // The board's own copy of the issue gate's cadence; null until its first read.
+    issueGate: async () =>
+      entry.issueConnector === null
+        ? null
+        : {
+            connector: entry.issueConnector,
+            account: entry.issueAccount,
+            requests: entry.issueRequests,
+            nextAt: entry.issueNextAt,
+            backoffUntil: entry.issueBackoffUntil,
+          },
   };
   await refreshPrsWith(world, entry);
 };
@@ -1813,15 +1855,16 @@ export async function maybeRefreshPrs(opts: BuildBoardOptions, entry: CacheEntry
     // memory, so the store stays the fleet's to write. Inferred from the pulse
     // answer, which is the only liveness signal the board reads.
     await refreshPrs(opts, entry, overlayFor(opts, entry));
-    // On the SAME gate as the PR fetch, so the issue lookup cannot become a
-    // second cadence quietly spending the host budget the gate exists to ration
-    // — including its rate-limit backoff. Sequential rather than concurrent for
-    // the same reason: two calls at one instant is what a rate limit counts.
+    // Inside the PR tick, behind the issue read's own gate (`issueNextAt`,
+    // `issueIntervalMs`), whose spend `refreshPrs` subtracts through
+    // `issueGate`. A rate limit either read names holds both gates. Sequential
+    // rather than concurrent: two calls at one instant is what a rate limit
+    // counts.
     //
     // After, and outside `refreshPrs`, because the two fail independently: a
     // tracker outage must not blank the PR map, and a PR failure must not
     // retract the inbox.
-    await refreshIssues(opts, entry);
+    if (prGateOpen(entry.issueNextAt, entry.issueNextIsBackoff)) await refreshIssues(opts, entry);
   } finally {
     entry.prRunning = false;
   }
@@ -2151,6 +2194,8 @@ export function freshCacheEntry(): CacheEntry {
     prAccount: null, prSlotsHeld: null,
     // 0, so the first fetch happens immediately rather than a minute in.
     prNextAt: 0, prNextIsBackoff: false, prIntervalMs: PR_REFRESH_MS,
+    issueNextAt: 0, issueNextIsBackoff: false, issueRequests: 0, issueBackoffUntil: null, issueConnector: null, issueAccount: null,
+    issueSets: null,
     // Null, never 'github': "not yet asked" and "asked, and it is GitHub" are
     // different answers, and `resolveBackend` distinguishes them to ask once.
     backend: null,

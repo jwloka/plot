@@ -5,6 +5,7 @@ import type {
   ClosedIssues,
   IssueOpen,
   IssueOpenOutcome,
+  IssueRead,
   StatusOutcome,
   StatusWrite,
   Tracker,
@@ -106,6 +107,7 @@ export const trackerJira = (context: ShellContext, baseUrl = ''): Tracker => {
     issueList: (limit): Promise<PortResult<readonly Issue[]>> => reads.issueList(limit),
 
     issueListClosed: (since, limit): Promise<PortResult<ClosedIssues>> => reads.issueListClosed(since, limit),
+    issueListOpen: (limit): Promise<PortResult<IssueRead>> => reads.issueListOpen(limit),
 
     issueView: (id): Promise<PortResult<Issue>> => reads.issueView(id),
 
