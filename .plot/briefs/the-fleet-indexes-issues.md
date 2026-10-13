@@ -82,7 +82,7 @@ This branch owns:
 - `CLAUDE.md:372-384` and generated `AGENTS.md` — the connector-doc correction
 - `packages/fleet/src/shared/issue-refresh.ts` (new) — `fleetIssues`, `refreshIssueIndex`, `IssueWorld`
 - `packages/fleet/src/shared/pr-refresh.ts` — `PrWorld.issueGate`, the backoff hold and subtraction in `refreshPrs`
-- `packages/fleet/src/registryd-main.ts:2013-2020` — building `IssueWorld` beside `PrWorld`
+- `packages/fleet/src/server/entry/registryd-main.ts:2013-2020` — building `IssueWorld` beside `PrWorld`
 - `packages/fleet/test/unit/one-issue-index-writer.test.ts` (new)
 - `packages/board/src/server/fleet.ts` — the `fleetOwnsPrs`-gated read of `issues.json` in place of the board's own `issue-list` call (the no-fleet `refreshIssues` path, `CacheEntry`'s `issueNextAt`/`issueRequests`/`issueBackoffUntil`, and `GET /api/issues/closed` are later slices' territory — don't build them here)
 - `scripts/owned-run.sh` — `PLOT_ISSUE_INDEX_HOME` beside `PLOT_PR_INDEX_HOME`
