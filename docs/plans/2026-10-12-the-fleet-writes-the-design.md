@@ -130,7 +130,7 @@ fleetd folds a `start` mark by clearing the plan's failure record and `declined`
 
 ### What the fleet reads
 
-- `feature/the-fleet-reads-design-work` — `specOf` moved into the domain and imported by the board entry; `rules/fleet-run.ts` extracted from `rules/auto-verify.ts` with re-exports; `specIsEmpty`, `designWork`, `specStart`, `specDeclined` and `specRow` in `rules/design-work.ts`, with unit tests; cross-file: `DESIGN-phases.md` §8 (`:323`) names `specIsEmpty(text)`, `designWork(readings)`, `specStart(input)`, `specDeclined(pr, answeredPr)` and `specRow(slug, designCommit, store, log, going, now)` <!-- builds: specIsEmpty, designWork, specStart, specDeclined, specRow and the shared run store -->
+- `feature/the-fleet-reads-design-work` → #1672 — `specOf` moved into the domain and imported by the board entry; `rules/fleet-run.ts` extracted from `rules/auto-verify.ts` with re-exports; `specIsEmpty`, `designWork`, `specStart`, `specDeclined` and `specRow` in `rules/design-work.ts`, with unit tests; cross-file: `DESIGN-phases.md` §8 (`:323`) names `specIsEmpty(text)`, `designWork(readings)`, `specStart(input)`, `specDeclined(pr, answeredPr)` and `specRow(slug, designCommit, store, log, going, now)` <!-- builds: specIsEmpty, designWork, specStart, specDeclined, specRow and the shared run store -->
 
 ### The spec run
 
