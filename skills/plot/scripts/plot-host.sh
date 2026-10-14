@@ -74,6 +74,12 @@
 #                                 empty answer sends the reaper to a weaker
 #                                 reading, so only a recognised lookup miss is
 #                                 empty.
+#   pr-review <number>             one JSON line `{"sha","state","bypass"}`: the PR's
+#                                 head sha, the newest `plot/review` status on it
+#                                 (`success|failure|pending|error`, or `absent`),
+#                                 and whether a comment starts `review-bypass:`.
+#                                 Bitbucket EXITS 4 (unaskable). EXIT 3 is the
+#                                 question failing.
 #   pr-create --title T [--body B] [--base BR] [--head BR] [--draft]
 #                                 create a PR, print its URL
 #   pr-merge <number> [--squash] [--delete-branch] [--match-head <sha>]
@@ -2215,7 +2221,6 @@ bb_lacks_issue_command() {
 
 # Cached capability state — empty until first call to bb_require_json.
 BB_CAP_CHECKED=""
-BB_CAP_HAS_JSON=""
 BB_CAP_IDENTITY=""    # "craftamap/0.6.0" or "quatico/1.2.3" or "unknown/<ver>"
 BB_CAP_PROBE_RC=""    # the exit code `bb pr list --help --json` returned
 BB_CAP_PROBE_MATCH="" # the line that matched a rejection pattern, if one did
@@ -2325,7 +2330,6 @@ bb_require_json() {
 
   # Allow tests to skip this (their stubs may not implement --help)
   if [ -n "${PLOT_BB_SKIP_CAP_CHECK:-}" ]; then
-    BB_CAP_HAS_JSON=1
     BB_CAP_IDENTITY="stub/test"
     return 0
   fi
@@ -2333,7 +2337,6 @@ bb_require_json() {
   BB_CAP_IDENTITY="$(bb_identify)"
 
   if ! bb_test_json_support; then
-    BB_CAP_HAS_JSON=0
     # THE OBSERVATION FIRST, THE IDENTITY WHERE ONE IS KNOWN.
     #
     # The plan asked for the observation and for dropping the provenance CLAIM
@@ -2349,7 +2352,6 @@ bb_require_json() {
     die3 "bb ($BB_CAP_IDENTITY): bb pr list --help --json exited ${BB_CAP_PROBE_RC:-?}${BB_CAP_PROBE_MATCH:+, matched: $BB_CAP_PROBE_MATCH} — this bb does not support --json for PR commands"
   fi
 
-  BB_CAP_HAS_JSON=1
   return 0
 }
 
@@ -3833,6 +3835,12 @@ case "$op" in
     fi
     ;;
 
+  pr-review)
+    [ "$be" = "github" ] || { echo "plot-host: pr-review: bitbucket is not supported yet" >&2; exit 4; }
+    out="$(gh pr view "${1:?pr-review needs a PR number}" --json headRefOid,comments)" && st="$(gh api "repos/{owner}/{repo}/commits/$(jq -r .headRefOid <<<"$out")/statuses")" \
+      && jq -c --argjson st "$st" '{sha: .headRefOid, state: ([$st[] | select(.context == "plot/review")][0].state // "absent"), bypass: any(.comments[]?; .body | startswith("review-bypass:"))}' <<<"$out" \
+      || { echo "plot-host: pr-review: the read failed" >&2; exit 3; } ;;
+
   pr-create)
     title=""; body=""; base=""; head=""; draft=0
     while [ $# -gt 0 ]; do
@@ -5284,6 +5292,6 @@ case "$op" in
     ;;
 
   *)
-    die "unknown op '$op' (backend|default-branch|pr-state|pr-create|pr-merge|pr-list|issue-list|issue-view|issue-status|issue-open|pr-body|rate-limit|limit|ci-limit|spend-rate|commit-status)"
+    die "unknown op '$op' (backend|default-branch|pr-state|pr-create|pr-merge|pr-list|issue-list|issue-view|issue-status|issue-open|pr-body|pr-review|rate-limit|limit|ci-limit|spend-rate|commit-status)"
     ;;
 esac

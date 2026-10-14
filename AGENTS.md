@@ -105,6 +105,23 @@ Plot dog-foods its own config mechanism. Helpers read these via `skills/plot/scr
 - **Auto-design:** false
 - **Review app:** 5317669 /Users/jwloka/.config/plot/plot-review.5317669.private-key.pem
 
+<!-- `Review app` names the GitHub App `plot-host.sh commit-status` and
+     `plot-commit-status.mjs` mint an installation token from to write the
+     `plot/review` status — `<app id> <key path>`, the key outside the repo.
+     The App is narrow (statuses: write; pull requests, contents: read), not
+     `plot-board-builder`, and is NOT on main's ruleset bypass list. The
+     ruleset rule requiring `plot/review` from this App is not yet added —
+     that is the plan's own last step, after every PR kind has a writer and
+     those writers are proven in production. One-time setup for this
+     repository and for a repository adopting the gate:
+     docs/review-status-rollout.md.
+
+     `Review required since: <ISO date>` is the optional cutoff for
+     `/plot-reconcile` section 20a: a PR merged after it with no passing
+     `plot/review` and no `review-bypass:` comment is reported. This file
+     sets none, so the section reports nothing here until a person records
+     the date the ruleset rule goes live. -->
+
 <!-- `Implement command` runs `/plot-implement <slug>` for the board's
      `Implement` control and for `WriteBriefButton`, which is the same route
      under the word a refused row is asking. Unset until 2026-09-06, and that

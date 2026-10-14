@@ -898,6 +898,7 @@ n_drift=0; n_mnd=0; n_stale=0; n_att=0; n_conc=0; n_claims=0; n_unrel=0
 n_unsliced=0; n_prose=0; n_unplanned_members=0; n_sprint_unset=0; n_sprint_mismatch=0
 n_stale_tally=0; n_idx=0; n_double=0
 n_rounds_drift=0; n_sprint_idx=0; n_sprint_ship=0; n_stated=0; n_unclaimed=0; n_merged_refs=0
+n_review_bypass=0
 n_no_changeset=0
 
 # ---------------------------------------------------------------------------
@@ -2542,6 +2543,29 @@ else
 fi
 echo
 
+# ---------------------------------------------------------------------------
+# 20a. Review bypass
+#
+# A PR merged after `Review required since` with no passing `plot/review` and
+# no `review-bypass:` comment. Evidence for a person to read, never a gate.
+#
+# THE RULE IS THE DOMAIN'S. `board/plot-review-bypass.mjs` lists the merged PRs
+# and reads each one's `plot/review` status and comments through the Host port,
+# then asks `reviewBypasses`. This section holds no condition: it prints the
+# bundle's answer and counts its `  PR #` lines. A PR whose read failed is named
+# by the bundle as unread and is never counted as clean; with no
+# `Review required since` key the bundle says so and reports nothing.
+echo "== 20a. Review bypass (a merge with no passing plot/review and no bypass note — a person decides) =="
+review_bypass_bundle="$script_dir/board/plot-review-bypass.mjs"
+if [ -f "$review_bypass_bundle" ] && command -v node >/dev/null 2>&1; then
+  review_bypass_out=$(node "$review_bypass_bundle" --since "$(bash "$script_dir/plot-config.sh" get 'Review required since' '')" --limit "$MERGED_PR_LIMIT")
+  printf '%s\n' "$review_bypass_out"
+  n_review_bypass=$(printf '%s\n' "$review_bypass_out" | grep -c '^  PR #')
+else
+  echo "  (not evaluated — board/plot-review-bypass.mjs or node is missing)"
+fi
+echo
+
 echo "== 21. Desks (a worktree the fleet left behind — a person decides) =="
 # THE READINGS ARE TAKEN HERE AND THE VERDICT IS THE RULE'S. This section
 # collects what is measurable about every worktree and asks
@@ -3381,5 +3405,5 @@ fi
 echo
 
 echo "Sweep complete. This report is advisory — nothing was changed."
-echo "summary: drift=$n_drift merged_not_delivered=$n_mnd stale=$n_stale claims=$n_claims attention=$n_att concurrent=$n_conc unreleased_delivered=$n_unrel uncut_slices=$n_unsliced prose_slice_names=$n_prose unplanned_members=$n_unplanned_members sprint_unset=$n_sprint_unset sprint_mismatch=$n_sprint_mismatch stale_tally=$n_stale_tally index_drift=$n_idx double_claims=$n_double rounds_drift=$n_rounds_drift sprint_index_drift=$n_sprint_idx sprint_shipped=$n_sprint_ship stated_waits=$n_stated unclaimed_work=$n_unclaimed merged_refs=$n_merged_refs desks=$n_desks no_changeset=$n_no_changeset open_issues=$n_open_issues unread_headings=$n_unread unread_waits=$n_unread_waits temp_sweepable=$n_temp_sweepable legacy_tmp_caches=$n_legacy_tmp broken_locks=$n_broken_locks pr_source=$PR_SOURCE main=$MAIN"
+echo "summary: drift=$n_drift merged_not_delivered=$n_mnd stale=$n_stale claims=$n_claims attention=$n_att concurrent=$n_conc unreleased_delivered=$n_unrel uncut_slices=$n_unsliced prose_slice_names=$n_prose unplanned_members=$n_unplanned_members sprint_unset=$n_sprint_unset sprint_mismatch=$n_sprint_mismatch stale_tally=$n_stale_tally index_drift=$n_idx double_claims=$n_double rounds_drift=$n_rounds_drift sprint_index_drift=$n_sprint_idx sprint_shipped=$n_sprint_ship stated_waits=$n_stated unclaimed_work=$n_unclaimed merged_refs=$n_merged_refs review_bypass=$n_review_bypass desks=$n_desks no_changeset=$n_no_changeset open_issues=$n_open_issues unread_headings=$n_unread unread_waits=$n_unread_waits temp_sweepable=$n_temp_sweepable legacy_tmp_caches=$n_legacy_tmp broken_locks=$n_broken_locks pr_source=$PR_SOURCE main=$MAIN"
 exit 0
