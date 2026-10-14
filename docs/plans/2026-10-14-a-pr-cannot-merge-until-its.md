@@ -72,7 +72,7 @@ Decided by the person on 2026-10-14.
 
 ### Tracer
 
-- `feature/a-pr-cannot-merge-until-its-host-op` — `plot-host.sh commit-status` on GitHub, writing with an installation token minted from the review App's ID and key (the `Review app` config key), and the `Host` port question; proven by writing `plot/review` on a scratch PR head, and by a refusal naming the missing key when none is configured <!-- builds: commit-status, a plot-host.sh op that writes a commit status -->
+- `feature/a-pr-cannot-merge-until-its-host-op` — `plot-host.sh commit-status` on GitHub, writing with an installation token minted from the review App's ID and key (the `Review app` config key), and the `Host` port question; proven by writing `plot/review` on a scratch PR head, and by a refusal naming the missing key when none is configured <!-- builds: commit-status, a plot-host.sh op that writes a commit status --> → #1705
 
 ### Implementation
 
