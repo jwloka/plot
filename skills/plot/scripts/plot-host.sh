@@ -4612,8 +4612,7 @@ case "$op" in
       # AN UNDECLARED KEY LEAVES THE QUERY BYTE-IDENTICAL. `$scope` is empty,
       # the two halves rejoin exactly as they were written, and an upgrade
       # changes nothing for a repository that never set the key.
-      scope=""
-      if projects="$(tracker_projects)" && [ -n "$projects" ]; then
+      scope=""; if projects="$(tracker_projects)" && [ -n "$projects" ]; then
         # `IN (A, B)`, never a trailing comma: paste joins N-1 separators over N
         # elements, so a one-element list — what adoption's seed writes — yields
         # `IN (A)` rather than `IN (A,)`.
@@ -4647,8 +4646,7 @@ case "$op" in
         # offset, so Jira reads the time in the reader's profile zone. Its
         # person clause drops with the open read's (D20), same reason.
         [ -n "$scope" ] || { echo "plot-host: closed Jira issues need 'Ticket prefixes' declared; an unscoped resolved query reads the whole instance" >&2; exit 4; }
-        when="${since:0:10} ${since:11:5}"
-        jql="resolved >= \"${when% }\"${scope} ORDER BY resolved DESC"
+        when="${since:0:10} ${since:11:5}"; jql="resolved >= \"${when% }\"${scope} ORDER BY resolved DESC"
         fields="$fields,resolutiondate"; paged=1
       # THE D23 INBOX READ: today's pre-D20 query, always person-scoped — kept
       # alongside the now-project-wide open read so *Waiting on you* still
