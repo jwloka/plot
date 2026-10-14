@@ -4650,12 +4650,10 @@ case "$op" in
         when="${since:0:10} ${since:11:5}"
         jql="resolved >= \"${when% }\"${scope} ORDER BY resolved DESC"
         fields="$fields,resolutiondate"; paged=1
-      elif [ "$state" = inbox ]; then
-        # THE D23 INBOX READ: today's pre-D20 query, always person-scoped —
-        # kept alongside the now-project-wide open read so *Waiting on you*
-        # still shows the reader's own tickets. `max` is already `$limit:-50`
-        # from above, the same default this read wants.
-        jql="${PLOT_JIRA_JQL:-assignee = currentUser() AND resolution = EMPTY ORDER BY created DESC}"
+      # THE D23 INBOX READ: today's pre-D20 query, always person-scoped — kept
+      # alongside the now-project-wide open read so *Waiting on you* still
+      # shows the reader's own tickets. `max` is already `$limit:-50` above.
+      elif [ "$state" = inbox ]; then jql="${PLOT_JIRA_JQL:-assignee = currentUser() AND resolution = EMPTY ORDER BY created DESC}"
       fi
       [ -z "$paged" ] || { max="${limit:-$ISSUE_PAGE_ROWS}"; [ "$max" -le "$ISSUE_PAGE_ROWS" ] || max="$ISSUE_PAGE_ROWS"; }
       token_args=(); [ -z "$page_token" ] || token_args=(--data-urlencode "nextPageToken=$page_token")
