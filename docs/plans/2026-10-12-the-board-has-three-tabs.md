@@ -14,6 +14,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-tabs-are-discovery-planning-delivery`
 - **Started:** 2026-10-13, Jan Wloka, `feature/waiting-on-you-shows-a-failed-verification`
 - **Started:** 2026-10-13, Jan Wloka, `feature/people-names-a-tracker-account`
+- **Started:** 2026-10-14, Jan Wloka, `feature/an-issue-names-its-assignee`
 
 ## Changelog
 
