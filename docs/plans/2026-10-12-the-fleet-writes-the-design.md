@@ -15,6 +15,7 @@
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-fleet-reads-design-work`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-fleet-commissions-the-spec`
 - **Started:** 2026-10-14, Jan Wloka, `feature/commission-design-is-removed`
+- **Started:** 2026-10-14, Jan Wloka, `feature/the-board-shows-the-spec-run`
 
 ## Changelog
 
