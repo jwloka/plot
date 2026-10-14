@@ -235,12 +235,20 @@ const runDeliver = async (
       return 1;
   }
 
+  // THE GATE READS `origin/<default>` for the commits a slice names, so the
+  // remote-tracking ref is refreshed first: a commit pushed a moment ago reads
+  // as missing from a stale one. A failed fetch changes nothing here: the gate
+  // then answers from the ref it has, and a commit it cannot find keeps the
+  // slice open.
+  const main = await resolveMain(ctx.repoRoot, ctx.scripts);
+  await runGit(['-C', ctx.repoRoot, 'fetch', '-q', 'origin', main]);
   const deliverability = await deliverabilityOf(
     {
       planStore: ctx.planStore,
       host: ctx.host,
       refs: ctx.refs,
       prIndex: ctx.prIndex,
+      defaultBranch: main,
     } satisfies DeliverabilityPorts,
     args.slug,
     planFile,
@@ -261,7 +269,6 @@ const runDeliver = async (
     write(`step: verified ${deliverability.merged} branch(es) merged${deferredSuffix}\n`);
   }
 
-  const main = await resolveMain(ctx.repoRoot, ctx.scripts);
   const who = args.who || process.env.PLOT_DELIVER_WHO || (await gitUserName(ctx.repoRoot));
   const today = localDate();
 

@@ -68,6 +68,14 @@
      A charter this clone does not hold is REPORTED, never refused — a plan
      written where `reviewer` is declared stays dispatchable where it is not. -->
 
+<!-- Done without a PR: in a repository that takes changes on the default branch
+     directly, a slice ends as commits. Name them at the end of the branch line
+     (`→ commit abc1234`, several as `→ commit abc1234, def5678`, another
+     repository as `→ owner/repo@abc1234`) and the slice counts as done once
+     every named commit is on the default branch. A PR slice keeps `→ #N`. A
+     commit of another repository cannot be read from here, so that slice stays
+     open until it is marked deferred. -->
+
 <!-- Spike: mark the slice that proves the design by writing the word spike as an HTML comment on its branch line, beside deferred:/claimed:/waits:. Optional; a plan marking none has no spike. -->
 
 - `feature/<slug>` — <description>

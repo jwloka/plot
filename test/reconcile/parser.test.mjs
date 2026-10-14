@@ -2743,3 +2743,55 @@ test('plan-meta: the five slices the latch lost are read, by plan and branch (di
       `${name} has no heading naming a branch the parser fails to read`);
   }
 });
+
+test('plan-meta: `→ commit <sha>` names the commits that complete a slice, and is absent otherwise', () => {
+  const meta = parseSource(`# Plan
+
+## Status
+
+- **Phase:** Approved
+- **Type:** docs
+
+## Slices
+
+- \`docs/one\` — pushed directly → commit abc1234
+- \`docs/two\` — two pushes → commit abc1234, def56789 → #12
+- \`docs/three\` — in another repository → acme/other@0123456789abcdef
+- \`docs/four\` — an ordinary PR → #7
+- \`docs/five\` — prose after the arrow is not a commit → commit nothex1
+- \`docs/six\` — fewer than seven hex characters is not a commit → commit abc12
+`);
+  const byName = Object.fromEntries(meta.waves[0].branches.map((b) => [b.branch, b]));
+  assert.deepEqual(byName['docs/one'].commits, ['abc1234']);
+  assert.deepEqual(byName['docs/two'].commits, ['abc1234', 'def56789'],
+    'a comma-separated list names several commits, in line order');
+  assert.deepEqual(byName['docs/three'].commits, ['acme/other@0123456789abcdef'],
+    'a cross-repository commit keeps its owner/repo@ prefix');
+  // ABSENT, NOT EMPTY — the rule `waits_on`, `builds` and `agent` keep.
+  for (const name of ['docs/four', 'docs/five', 'docs/six']) {
+    assert.ok(!('commits' in byName[name]), `${name} names no commit, so it carries no commits key`);
+  }
+  assert.deepEqual(meta.prs, [7, 12], 'a commit annotation adds no PR, and a PR beside one still counts');
+});
+
+test('plan-meta: `→ commit <sha>` reads identically in the heading dialect', () => {
+  const meta = parseSource(`# Plan
+
+## Status
+
+- **Phase:** Approved
+- **Type:** docs
+
+## Slices
+
+### Pushed (Branch: docs/one) → commit abc1234
+First slice.
+
+### Opened (Branch: docs/two, PR: #9)
+Second slice.
+`);
+  const byName = Object.fromEntries(meta.waves.flatMap((w) => w.branches).map((b) => [b.branch, b]));
+  assert.deepEqual(byName['docs/one'].commits, ['abc1234']);
+  assert.ok(!('commits' in byName['docs/two']));
+  assert.deepEqual(meta.prs, [9]);
+});

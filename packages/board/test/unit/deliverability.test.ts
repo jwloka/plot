@@ -251,3 +251,167 @@ describe('deliverabilityOf reads the PR store before the host', () => {
     expect(answer.merged).toBe(1);
   });
 });
+
+describe('deliverabilityOf reads the commits a slice names', () => {
+  /** A plan whose slices each name branch, commits and deferral. */
+  const commitPlan = (
+    lines: readonly { branch: string; commits?: readonly string[]; deferred?: boolean }[],
+  ) =>
+    planRecord({
+      file: FILE,
+      slices: [
+        {
+          name: 'one',
+          branches: lines.map((l) => ({
+            branch: l.branch,
+            deferred: l.deferred ?? false,
+            deferredReason: '',
+            claimed: '',
+            waitsOn: [],
+            ...(l.commits ? { commits: l.commits } : {}),
+          })),
+        },
+      ],
+    });
+
+  /** Refs that hold exactly the commits in `onDefault`; every other commit is absent. */
+  const refsHolding = (onDefault: readonly string[], asked: string[] = []) =>
+    ({
+      commitFiles: async () => ({ ok: true, value: ['src/work.ts'] }),
+      defaultBranch: async () => ({ ok: true, value: 'main' }),
+      contains: async (ancestor: string, descendant: string) => {
+        asked.push(`${ancestor} in ${descendant}`);
+        return { ok: true, value: onDefault.includes(ancestor) ? 'yes' : 'no' };
+      },
+    }) as never;
+
+  /** A host that answers "merged" for these heads only. */
+  const hostMerging = (heads: readonly string[]): Host =>
+    ({
+      ...throwingHost(),
+      prMerged: async (branch: string) => ({ ok: true, value: heads.includes(branch) ? 'merged' : 'not-merged' }),
+      prMergeCommit: async () => ({ ok: true, value: '' }),
+    }) as unknown as Host;
+
+  const withRefs = (
+    p: ReturnType<typeof commitPlan>,
+    refs: never,
+    host: Host = throwingHost(),
+  ): DeliverabilityPorts => ({
+    planStore: planStoreFixture({ plans: [p] }),
+    host,
+    refs,
+    prIndex: prIndexFixture(null),
+  });
+
+  it('is deliverable when every named commit is on the default branch, and asks the host nothing', async () => {
+    const asked: string[] = [];
+    const p = withRefs(
+      commitPlan([{ branch: 'docs/foo', commits: ['abc1234', 'def5678'] }]),
+      refsHolding(['abc1234', 'def5678'], asked),
+    );
+    const answer = await deliverabilityOf(p, SLUG, FILE);
+    expect(answer.deliverable).toBe(true);
+    expect(answer.merged).toBe(1);
+    expect(asked).toEqual(['abc1234 in origin/main', 'def5678 in origin/main']);
+  });
+
+  it('keeps the slice open when one named commit is not on the default branch', async () => {
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([{ branch: 'docs/foo', commits: ['abc1234', 'def5678'] }]),
+        refsHolding(['abc1234']),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.deliverable).toBe(false);
+    expect(answer.reason).toBe('branches-unmerged');
+    expect(answer.unmerged).toEqual(['docs/foo']);
+  });
+
+  it('lets the commits decide even when a PR under the same head merged', async () => {
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([{ branch: 'docs/foo', commits: ['abc1234'] }]),
+        refsHolding([]),
+        hostMerging(['docs/foo']),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.deliverable).toBe(false);
+    expect(answer.unmerged).toEqual(['docs/foo']);
+  });
+
+  it('delivers a mix of a merged PR, a landed commit and a deferred slice', async () => {
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([
+          { branch: 'feature/by-pr' },
+          { branch: 'docs/by-push', commits: ['abc1234'] },
+          { branch: 'docs/given-up', commits: ['ffff000'], deferred: true },
+        ]),
+        refsHolding(['abc1234']),
+        hostMerging(['feature/by-pr']),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.deliverable).toBe(true);
+    expect(answer.merged).toBe(2);
+    expect(answer.deferred).toBe(1);
+  });
+
+  it('refuses the mix when the PR slice is unmerged although the commit landed', async () => {
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([{ branch: 'feature/by-pr' }, { branch: 'docs/by-push', commits: ['abc1234'] }]),
+        refsHolding(['abc1234']),
+        hostMerging([]),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.deliverable).toBe(false);
+    expect(answer.unmerged).toEqual(['feature/by-pr']);
+  });
+
+  it('does not read a commit in another repository as done', async () => {
+    const asked: string[] = [];
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([{ branch: 'docs/foo', commits: ['acme/other@abc1234'] }]),
+        refsHolding(['abc1234'], asked),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.deliverable).toBe(false);
+    expect(answer.reason).toBe('cannot-tell');
+    expect(answer.refusal).toContain('another repository');
+    expect(asked).toEqual([]);
+  });
+
+  it('keeps the slice open when a local commit is missing beside a foreign one', async () => {
+    const answer = await deliverabilityOf(
+      withRefs(
+        commitPlan([{ branch: 'docs/foo', commits: ['abc1234', 'acme/other@def5678'] }]),
+        refsHolding([]),
+      ),
+      SLUG,
+      FILE,
+    );
+    expect(answer.reason).toBe('branches-unmerged');
+  });
+
+  it('uses the default branch the caller resolved', async () => {
+    const asked: string[] = [];
+    const base = withRefs(
+      commitPlan([{ branch: 'docs/foo', commits: ['abc1234'] }]),
+      refsHolding(['abc1234'], asked),
+    );
+    await deliverabilityOf({ ...base, defaultBranch: 'trunk' }, SLUG, FILE);
+    expect(asked).toEqual(['abc1234 in origin/trunk']);
+  });
+});

@@ -48,6 +48,7 @@ interface RawBranch {
   claimed?: string;
   waits_on?: string | readonly string[];
   spike?: boolean;
+  commits?: readonly string[];
 }
 
 /**
@@ -76,6 +77,7 @@ export const branchOf = (raw: RawBranch): PlanRecordBranch => ({
       ? [raw.waits_on]
       : [],
   ...(raw.spike === true ? { spike: true } : {}),
+  ...(raw.commits !== undefined && raw.commits.length > 0 ? { commits: raw.commits } : {}),
 });
 
 const sliceOf = (raw: RawSlice): PlanRecordSlice => ({

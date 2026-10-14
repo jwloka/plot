@@ -3151,7 +3151,7 @@ for line in sys.stdin:
                 "W", f, str(i), ref, str(b.get("deferred")).lower(),
                 (b.get("deferred_reason") or "-"),
                 (",".join(waits_on) if isinstance(waits_on, list) else waits_on) or "-",
-                name or "-", b.get("claimed") or "-"]))
+                name or "-", b.get("claimed") or "-", ",".join(b.get("commits") or []) or "-"]))
 ' 2>/dev/null) || records=""
 
   local kind file rest
@@ -3888,7 +3888,21 @@ EOF
 MAIN_TIP=$(remote_ref_oid "$MAIN")
 [ -n "$MAIN_TIP" ] || MAIN_TIP="-"
 
-branch_readings() { # $1=branch $2=deferred $3=plan-base → readings
+# WHETHER EVERY COMMIT A SLICE LINE NAMES (`→ commit abc1234`) IS ON THE DEFAULT
+# BRANCH. A slice completed by a direct push has no PR, so this is its only
+# evidence. Like the merge subject it may only move a branch from `open` to
+# `merged` (a reversible wave step), never decide a delivery: the delivery gate
+# reads the same commits itself. A commit of another repository
+# (`owner/repo@sha`) is not a revision here, so the slice stays open.
+commits_landed() { # $1=comma-separated commits or "-" → 0 when all are on origin/$MAIN
+  [ "${1:--}" != - ] || return 1
+  for _c in ${1//,/ }; do
+    # plot-ancestry: evidence — a commit named by hash is the exact object a direct push put on the default branch; no merge rewrites it, and the wave gate only settles a slice from it.
+    git merge-base --is-ancestor "$_c" "origin/$MAIN" 2>/dev/null || return 1
+  done
+}
+
+branch_readings() { # $1=branch $2=deferred $3=plan-base $4=commits → readings
   local br="$1" _bs_deferred="$2" _bs_plan="${3:-}" _bs_subject=false
   local _bs_ahead=0 _bs_real=0 _bs_tip
   local _bs_main="$MAIN_TIP"
@@ -3928,6 +3942,7 @@ branch_readings() { # $1=branch $2=deferred $3=plan-base → readings
     # where an unstarted reused name read `merged`, its slice read complete,
     # the next slice opened, and the reused slice was never offered.
     merged_by_subject "$_bs_plan" "$br" && _bs_subject=true
+    commits_landed "${4:--}" && _bs_subject=true
     # A subject the age rule refused is reported apart from one that never
     # existed: both read `unknown` under a refused host, and only this one has
     # an explanation.
@@ -4375,12 +4390,12 @@ for plan in "${plans[@]}"; do
   # main as `open` only when it is true; a capped list may omit a merged PR.
   list_complete=false
   [ -n "$HOST_STATE_CACHE" ] && [ -f "$HOST_STATE_CACHE/.list-complete" ] && list_complete=true
-  while IFS=$'\t' read -r idx br deferred why waits wname claim; do
+  while IFS=$'\t' read -r idx br deferred why waits wname claim commits; do
     [ -n "$br" ] || continue
     # "-" is the absent marker the shim writes, for the tab-collapse reason
     # above. Normalized here so everything downstream tests emptiness.
     [ "$waits" = "-" ] && waits=""
-    readings+="$(branch_readings "$br" "$deferred" "$plan_base")	${waits:--}	?	$list_complete	?"$'\n'
+    readings+="$(branch_readings "$br" "$deferred" "$plan_base" "$commits")	${waits:--}	?	$list_complete	?"$'\n'
     # Read from the readings line just built rather than from the variable: the
     # subshell `branch_readings` runs in cannot export it back.
     # FIELD 6 is the host's own word, in both arms of `branch_readings`:
