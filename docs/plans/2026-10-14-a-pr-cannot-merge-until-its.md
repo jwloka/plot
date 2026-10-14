@@ -84,7 +84,7 @@ Decided by the person on 2026-10-14.
 
 ### Rollout
 
-- `docs/a-pr-cannot-merge-until-its-branch-rule` — the controllers and the release step write their own status; `/plot-reconcile` reports a PR merged with no passing `plot/review` and no `review-bypass:` comment; the docs give the person's one-time steps (create and install the App, store its key, add the ruleset requiring `plot/review` from the App) for this repository and for adopting repositories
+- `docs/a-pr-cannot-merge-until-its-branch-rule` — the controllers and the release step write their own status; `/plot-reconcile` reports a PR merged with no passing `plot/review` and no `review-bypass:` comment; the docs give the person's one-time steps (create and install the App, store its key, add the ruleset requiring `plot/review` from the App) for this repository and for adopting repositories → #1717 (the release step has no instrumentable call site found this slice — reported in `docs/review-status-rollout.md` rather than built; the bypass report's signal is `pr-state`'s folded `checks`, an approximation also named there; the ruleset rule itself is not yet flipped, per this plan's own sequencing)
 
 ## Notes
 
