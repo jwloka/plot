@@ -298,6 +298,23 @@ Plans can define a `### Tracer` subsection in `## Slices` (see plan template). W
 
 `/plot-approve` step 2b suggests a tracer bullet when uncertainty or feature size warrants it.
 
+## Slices Completed by a Direct Push
+
+A repository that takes changes on the default branch directly ends a slice as commits, not as a merged PR. The slice line names them after an arrow, the commit spelling of `→ #N`:
+
+```markdown
+- `docs/foo` — description → commit abc1234
+- `docs/bar` — two pushes → commit abc1234, def5678
+- `docs/baz` — pushed in another repository → owner/repo@abc1234
+```
+
+A commit is 7 or more lowercase hex digits. Both slice dialects read the arrow from the line that carries the branch name, and `plot-plan-meta.sh` reports it as `waves[].branches[].commits`.
+
+- **Done means every named commit is on the default branch.** `/plot-deliver` fetches the default branch and asks git whether each commit is reachable from `origin/<default>`. A commit that is not there keeps the slice open. The commits decide the slice: a PR under the same branch name neither completes it nor blocks it.
+- **Wave eligibility reads the same commits.** `plot-fleet-scan.sh` reads a slice as merged once its commits are on `origin/<default>`, so the next wave opens. Unlike a PR, the scan treats this as evidence for the wave gate only; it never starts a delivery by itself.
+- **A commit in another repository cannot be read.** Plot has no host operation that answers reachability in a foreign repository, so a slice that names only `owner/repo@abc1234` stays open and `/plot-deliver` says why. Mark it `<!-- deferred: <reason> -->`, or name a commit of this repository.
+- **A PR slice is unchanged.** `→ #N` and `→ owner/repo#N` work as before, and one plan may mix both kinds.
+
 ## Troubleshooting
 
 ### Plan PR has merge conflicts

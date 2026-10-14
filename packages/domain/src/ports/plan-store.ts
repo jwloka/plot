@@ -81,6 +81,12 @@ export interface PlanRecordBranch {
   waitsOn: readonly string[];
   /** Whether the branch line carries `<!-- spike -->`; absent where it does not. */
   spike?: boolean;
+  /**
+   * The commits the slice line names as its completion, in line order:
+   * `abc1234` for this repository, `owner/repo@abc1234` for another one.
+   * Absent where the line names none.
+   */
+  commits?: readonly string[];
 }
 
 /**

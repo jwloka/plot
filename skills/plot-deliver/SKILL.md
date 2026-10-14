@@ -120,6 +120,8 @@ Expected format once PRs exist (annotated at PR creation or back-filled above):
 - `feature/name` — description → #12
 ```
 
+A slice completed by a direct push to the default branch has no PR. Its line names the commits instead: `→ commit abc1234` (several: `→ commit abc1234, def5678`; another repository: `→ owner/repo@abc1234`). Such a slice is done when every named commit is reachable from the default branch of this repository, and one commit that is not there keeps it open. A commit in another repository cannot be read from here, so that slice stays open. See "Slices Completed by a Direct Push" in the plot skill.
+
 ### 4. Verify All PRs Merged
 
 Run the helper:
@@ -136,6 +138,8 @@ matching the branch NAME against the heads of merged PRs — the same derivation
 whose worker never annotated. All host access stays inside `plot-host.sh`
 (a single bundled `pr-list --state merged` for the whole plan, then a per-PR
 `pr-state`); nothing here calls `gh`/`bb` directly.
+
+**The helper reads PRs only.** A slice line that names commits (`→ commit abc1234`) has no PR, so the helper omits it from `prs`, and a plan made of such slices prints `{"prs": []}` — that is not a failure. Check those slices with `../plot/scripts/plot-deliver.sh --dry-run <slug>`: it fetches the default branch, asks git whether each named commit is reachable from `origin/<default>`, and refuses naming every slice whose commit is not.
 
 Matching does NOT weaken the gate: a branch with no merged PR head and no
 annotation resolves nothing — it is never fabricated as merged — so a plan with
@@ -176,6 +180,7 @@ Re-read the plan's branches section (heading containing "Branches"). For each br
 
 For each non-deferred branch:
 
+0. If its line names commits (`→ commit abc1234`), the commits decide: the branch is accounted for when `plot-deliver.sh --dry-run` finds every one on the default branch, and unaccounted for otherwise. Skip the PR checks below for it.
 1. Check if a merged PR exists for that branch: `gh pr list --state merged --head <branch-name> --json number`
 2. If no merged PR exists for the exact branch name, check if another merged PR covers that branch's scope (e.g., branches were consolidated into fewer PRs)
 3. If a branch has no merged PR AND no consolidation evidence, it is **unaccounted for**

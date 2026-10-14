@@ -1,5 +1,6 @@
 import { deliver, refused, type DeliverBranchReading } from '@plot-pm/domain';
 import type { Host, PlanStore, Refs } from '@plot-pm/domain';
+import { commitVerdict, isForeignCommit } from '@plot-pm/domain/rules/commit-evidence';
 import { mergedRowByHead } from '@plot-pm/domain/rules/merged-row';
 import type { PrIndexStore } from '@plot-pm/domain/ports/pr-index';
 
@@ -35,6 +36,14 @@ export interface DeliverabilityAnswer {
   emptySlices: string[];
 }
 
+/** A branch a plan names, with whether the plan gave it up and the commits that complete it. */
+interface NamedBranch {
+  branch: string;
+  deferred: boolean;
+  /** Commits the slice line names as its completion; empty where it names none. */
+  commits: readonly string[];
+}
+
 /**
  * Every branch a plan names, with whether the plan gave it up.
  *
@@ -48,26 +57,66 @@ export interface DeliverabilityAnswer {
  * inside a code fence — and never reached the section that names the plan's
  * actual work.
  *
+ * A branch named twice keeps every commit either mention names.
+ *
  * @param meta the parsed plan, as `plot-plan-meta.sh` emitted it
  * @returns one reading per branch, merge state left for the host to fill
  */
 const branchesOf = (
-  plan: { slices: readonly { branches: readonly { branch: string; deferred: boolean }[] }[] },
-): { branch: string; deferred: boolean }[] => {
-  const seen = new Map<string, boolean>();
+  plan: { slices: readonly { branches: readonly { branch: string; deferred: boolean; commits?: readonly string[] }[] }[] },
+): NamedBranch[] => {
+  const seen = new Map<string, NamedBranch>();
   for (const slice of plan.slices) {
     for (const b of slice.branches) {
       // A branch named twice is deferred only if EVERY mention defers it —
       // the same direction the script's per-line grep resolved to, and the
       // safe one: a branch still owed by any slice is outstanding work.
-      seen.set(b.branch, (seen.get(b.branch) ?? true) && b.deferred);
+      const held = seen.get(b.branch);
+      seen.set(b.branch, {
+        branch: b.branch,
+        deferred: (held?.deferred ?? true) && b.deferred,
+        commits: [...new Set([...(held?.commits ?? []), ...(b.commits ?? [])])],
+      });
     }
   }
-  return [...seen].map(([branch, deferred]) => ({ branch, deferred }));
+  return [...seen.values()];
 };
 
 /** How one branch's merge state resolved. */
 type BranchMergeState = 'merged' | 'not-merged' | 'unknown';
+
+/**
+ * Whether the default branch of THIS repository contains every named commit.
+ *
+ * A commit in another repository (`owner/repo@abc1234`) reads `unknown`: the
+ * host port has no operation that answers reachability in a foreign repository,
+ * and this repository holds none of its objects. The slice stays open and the
+ * refusal names the limit; it is never read as done. The default branch is
+ * `ports.defaultBranch` where the caller resolved one, else the refs port's.
+ *
+ * @param ports - the refs to ask, and the default branch where the caller knows it
+ * @param commits - the commit references the slice line names
+ * @returns `merged` where every commit is contained, `not-merged` where one is not, `unknown` otherwise
+ */
+const commitMergeState = async (
+  ports: { refs: Refs; defaultBranch?: string },
+  commits: readonly string[],
+): Promise<BranchMergeState> => {
+  let main = ports.defaultBranch ?? '';
+  if (main === '') {
+    const named = await ports.refs.defaultBranch();
+    main = named.ok ? named.value : '';
+  }
+  const reads = await Promise.all(
+    commits.map(async (ref) => {
+      if (isForeignCommit(ref) || main === '') return 'unknown' as const;
+      const answer = await ports.refs.contains(ref, `origin/${main}`);
+      return answer.ok ? answer.value : ('unknown' as const);
+    }),
+  );
+  const verdict = commitVerdict(reads);
+  return verdict === 'landed' ? 'merged' : verdict === 'missing' ? 'not-merged' : 'unknown';
+};
 
 /**
  * Which of these branches merged, the store asked first and the host asked
@@ -91,15 +140,24 @@ type BranchMergeState = 'merged' | 'not-merged' | 'unknown';
  * @returns one state per branch, in the same order.
  */
 const mergedBranches = async (
-  ports: { host: Host; prIndex: PrIndexStore },
+  ports: { host: Host; prIndex: PrIndexStore; refs: Refs; defaultBranch?: string },
   connector: string,
-  branches: readonly string[],
+  branches: readonly NamedBranch[],
 ): Promise<Map<string, BranchMergeState>> => {
   const read = await ports.prIndex.read(connector);
   const held = read.ok ? read.value : null;
 
   const states = new Map<string, BranchMergeState>();
-  for (const branch of branches) {
+  for (const { branch, commits } of branches) {
+    // A SLICE THAT NAMES COMMITS IS DECIDED BY THEM, and by nothing else. The
+    // PR store and the host answer for a PR that carried the work; this slice
+    // was completed by a direct push, so a PR under its name, merged or not,
+    // says nothing about it. A named commit the default branch lacks keeps the
+    // slice open.
+    if (commits.length > 0) {
+      states.set(branch, await commitMergeState(ports, commits));
+      continue;
+    }
     if (held !== null && mergedRowByHead(held, branch) !== undefined) {
       states.set(branch, 'merged');
       continue;
@@ -181,6 +239,12 @@ const isMarker = (path: string): boolean => path.startsWith('PLOT-BLOCKED');
  */
 /** The readings this controller needs, each behind its own port. */
 export interface DeliverabilityPorts {
+  /**
+   * The repository's default branch, where the caller already resolved it. The
+   * refs port's own answer falls back to the checked-out branch, which is the
+   * wrong default for a gate that reads `origin/<default>`.
+   */
+  defaultBranch?: string;
   /** Reads the plan — which branches it names, and which it gave up. */
   planStore: PlanStore;
   /** Answers whether the host merged a branch, for what the store cannot. */
@@ -235,9 +299,9 @@ export const deliverabilityOf = async (
   // decides nothing, and asking it could only spend a host call or turn an
   // `unknown` into a `cannot-tell` refusal for a branch delivery ignores.
   const merged = await mergedBranches(
-    { host: ports.host, prIndex: ports.prIndex },
+    { host: ports.host, prIndex: ports.prIndex, refs: ports.refs, defaultBranch: ports.defaultBranch },
     connector,
-    named.filter((b) => !b.deferred).map((b) => b.branch),
+    named.filter((b) => !b.deferred),
   );
 
   // A HOST THAT COULD NOT ANSWER REFUSES AS `cannot-tell`, NEVER AS UNMERGED.
@@ -254,7 +318,7 @@ export const deliverabilityOf = async (
       ...empty,
       deliverable: false,
       reason: 'cannot-tell',
-      refusal: `cannot tell whether ${unresolved.length} branch(es) merged: ${names}. The host did not answer — try again rather than treating silence as unmerged.`,
+      refusal: `cannot tell whether ${unresolved.length} branch(es) merged: ${names}. The host did not answer — try again rather than treating silence as unmerged. A slice that names a commit in another repository (\`owner/repo@sha\`) cannot be read from here: mark it deferred, or name a commit of this repository.`,
       merged: confirmed,
     };
   }
@@ -266,8 +330,10 @@ export const deliverabilityOf = async (
     // an unmerged one refuses the delivery outright, so neither is worth a host
     // call — which is what keeps this inside the per-branch budget delivery
     // already spends.
+    // A commit-backed slice carries its work in the named commits, and no PR
+    // exists to ask about.
     const carriedWork = didMerge && !b.deferred
-      ? await carriedWorkOf(ports, b.branch)
+      ? (b.commits.length > 0 ? true : await carriedWorkOf(ports, b.branch))
       : 'unknown';
     branches.push({ branch: b.branch, deferred: b.deferred, merged: didMerge, carriedWork });
   }

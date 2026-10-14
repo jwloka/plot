@@ -115,6 +115,12 @@ export const PlanMetaSchema = z.preprocess(readEitherSpelling, z.object({
        * reported no annotation, not that the plan was checked and has none.
        */
       spike: z.boolean().default(false),
+      /**
+       * The commits the slice line names as its completion: `abc1234`, or
+       * `owner/repo@abc1234` for another repository. Defaulted to `[]`, so
+       * output from a parser predating the annotation still validates.
+       */
+      commits: z.array(z.string()).default([]),
     })).default([]),
   })).default([]),
   prs: z.array(z.number()).default([]),

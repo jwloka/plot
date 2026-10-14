@@ -166,6 +166,16 @@
 #                  charter name is a bare word with no structure to check, so a
 #                  template documents the marker inside an outer comment block,
 #                  where this pattern cannot see it.
+#                  `→ commit abc1234` / `→ commit abc1234, def5678` /
+#                  `→ owner/repo@abc1234` name the COMMITS that completed the
+#                  slice, reported as `waves[].branches[].commits` in line order.
+#                  The commit spelling of `→ #N` / `→ owner/repo#N`, for a slice
+#                  pushed straight to the default branch with no PR. A commit is
+#                  7 or more lowercase hex digits; a cross-repository one keeps
+#                  its `owner/repo@` prefix because a consumer must tell it from
+#                  one of this repository. ABSENT where none is named, never [];
+#                  both slice dialects read it from the branch-carrying line.
+#                  It adds nothing to `prs`: a commit is not a PR.
 #   prs            PR numbers, sorted and unique, read from EITHER spelling:
 #                  `→ #NNN` / `→ owner/repo#NNN` links in the `## Branches`
 #                  section, OR `PR: #NNN` in a `## Waves` `### ` heading. The
@@ -513,12 +523,9 @@ function reset_state() {
   delete issues; n_issues = 0
   delete wave_names; delete wave_of; delete wave_seq; delete wave_count
   delete deferred_of; delete deferred_why; delete claimed_of; delete ordered_b; delete spike_of; n_waves = 0
-  delete branch_heading
-  delete waits_of; delete waits_set; delete waits_n
+  delete branch_heading; delete waits_of; delete waits_set; delete waits_n
   delete unread_waits_branch; delete unread_waits_value; n_unread_waits = 0
-  delete builds_of; delete builds_set
-  delete agent_of; delete agent_set
-  delete started; n_started = 0
+  delete builds_of; delete agent_of; delete commits_of; delete started; n_started = 0
   fm_changelog = ""
   delete changelog; n_changelog = 0; changelog_seen = 0; cl_open = 0
 }
@@ -705,14 +712,18 @@ function emit_record(   fmt, praw, palt_raw, traw, title, sprint, story, assigne
       # ABSENT, NOT EMPTY, for the same reason `waits_on` is: a slice that
       # names no deliverable emits no key, so a consumer reads a name or
       # nothing. An empty string would read as a deliverable called "".
-      if (builds_set[i] == 1) out = out ",\"builds\":\"" jesc(builds_of[i]) "\""
+      if (builds_of[i] != "") out = out ",\"builds\":\"" jesc(builds_of[i]) "\""
       # ABSENT, NOT EMPTY, the rule the three annotations above already keep.
       # Dispatch reads the PRESENCE of this key to decide whether the plan names
       # a kind at all, so an `"agent":""` would read as a charter called "" and
       # send it looking for `.plot/charters/.json`.
       # NOTE: no apostrophe may appear in this awk region — the whole program is
       # one single-quoted shell string, and one closes it mid-comment.
-      if (agent_set[i] == 1) out = out ",\"agent\":\"" jesc(agent_of[i]) "\""
+      if (agent_of[i] != "") out = out ",\"agent\":\"" jesc(agent_of[i]) "\""
+      # ABSENT, NOT EMPTY, as the annotations above: the commits the slice line
+      # names as its completion, `abc1234` or `owner/repo@abc1234`, in line order.
+      # Hex and owner/repo characters need no escaping.
+      if (commits_of[i] != "") { cm = commits_of[i]; gsub(/,/, "\",\"", cm); out = out ",\"commits\":[\"" cm "\"]" }
       out = out "}"
       first = 0
     }
@@ -816,6 +827,174 @@ function store_waits(n, b,   k) {
     unread_waits_value[n_unread_waits] = pending_unread_value[k]
   }
   delete pending_unread_value; pending_unread_n = 0
+}
+# Reads every annotation that binds to the line carrying a branch name, into
+# claim_note, defer_note, line_waits[], builds_note and agent_note. Called by BOTH
+# slice dialects before their branch match, which clobbers RSTART/RLENGTH.
+function read_notes() {
+  # Claim reflection, written by the worker after its ref push succeeds. This is
+  # a reflection, not the claim: git refs remain authoritative. Computed before
+  # the branch loop below — match() clobbers RSTART/RLENGTH, which that loop
+  # needs to advance.
+  claim_note = (index($0, "claimed:") > 0) ? marker_value($0, "claimed") : ""
+  # THE REASON FOR THE DEFERRAL, and not merely the fact of one.
+  #
+  # `<!-- deferred: verified already implemented 2026-08-17 — startRepair() at
+  # fleet.ts:806 -->` was tested for presence and the sentence after the colon
+  # was dropped on the floor. So the board could say `deferred` beside `no
+  # commits` and never say that the first is the REASON for the second — a
+  # reader with no access to the plan file saw a branch nobody started and no
+  # statement that nobody should.
+  #
+  # Extracted the same way and in the same place as the claim note, for the same
+  # reason: `match()` in the branch loop below clobbers RSTART/RLENGTH, so
+  # anything read from the whole line must be read before it runs.
+  #
+  # Newlines are already impossible here — awk hands this rule one line, and the
+  # documented contract is that an annotation binds to the line carrying the
+  # branch name. A deferral whose text is wrapped onto a continuation line is
+  # not seen, exactly as `deferred` itself was not.
+  # `moved:` IS THE SAME ANSWER AS `deferred:`, and CLAUDE.md has said so since
+  # the reconcile scan was written: *"`deferred:`/`moved:` in the plan means
+  # reapable"*. `plot-reconcile-scan.sh:504` matches both in one arm; this
+  # parser matched only the first, so a slice given up with the other word read
+  # as still outstanding — to the board, the delivery gate and the fleet alike.
+  # Measured 2026-09-04 on `feature/the-reaper-sweeps-every-kind`: annotated
+  # `moved:` into the slice that superseded it, still `deferred:false` here.
+  #
+  # The two words differ in what they tell a READER — given up, versus taken
+  # somewhere else — and the reason is kept verbatim, so the distinction is not
+  # lost by being read alike.
+  defer_note = (index($0, "deferred:") > 0 || index($0, "moved:") > 0) ? marker_value($0, "deferred|moved") : ""
+  # THE PREREQUISITES THIS BRANCH NAMES: `<!-- waits: bug/other-branch -->`.
+  #
+  # A LIST, not one name. Several `<!-- waits: … -->` comments on a line, or one
+  # `<!-- waits: x, y -->`, give the same list in document order, duplicates
+  # removed — see parse_waits(). The old greedy `sub()` took only the LAST
+  # annotation when a line carried two, which silently dropped every other
+  # prerequisite a slice had cleared for merge eligibility by itself (#1153).
+  #
+  # Each value is a BRANCH NAME, so it stops at the first whitespace or comma
+  # rather than running to the closing marker the way a deferral reason does: a
+  # reason is a sentence, a branch name is a token, and trailing prose inside
+  # the comment would silently become part of a name that then matches nothing.
+  #
+  # `deferred:` is a judgement and `waits:` is a checkable fact, so the two are
+  # separate annotations and both may sit on one line. Read here, beside the
+  # other two, for the same reason: `match()` in the branch loop below clobbers
+  # RSTART/RLENGTH, so anything read from the whole line must be read first.
+  #
+  # Presence is separate from the value, because ABSENT and
+  # EMPTY are different answers — a branch declaring no prerequisite emits no
+  # `waits_on` key at all, never `[]`.
+  #
+  # A value that does not look like a branch is NOT dropped — parse_waits()
+  # queues it in pending_unread_value[], and once the branch this line claims is
+  # known (below), it is copied into unread_waits_branch[]/unread_waits_value[].
+  # A line with no branch claim never drains the queue, so a `waits:` syntax
+  # example in prose — not on a branch line — stays silent, as today.
+  delete line_waits
+  parse_waits($0, line_waits)
+  # WHAT THIS SLICE BUILDS: `<!-- builds: normalizeVersion, a shared helper -->`.
+  #
+  # AN ANNOTATION, NOT A FIELD LINE, and that is what makes it work in BOTH
+  # slice dialects with no dialect-specific code. Annotations bind to the line
+  # carrying the branch name — the list item in one spelling, the `### `
+  # heading in the other — and both dialects already read `deferred:`,
+  # `claimed:` and `waits:` with the identical block. A `Builds:` field line
+  # would have had two spellings to parse, and the template writes the LIST
+  # dialect, so the heading-only version would be absent from every plan
+  # created from it.
+  #
+  # IT BELONGS TO THE SLICE, NEVER TO THE PLAN. A plan builds several things
+  # and each slice builds one; a plan-level list is searched as a whole and
+  # reported against the wrong slice.
+  #
+  # The value runs to the closing marker, the way `deferred:` does and unlike
+  # `waits:`. A prerequisite is a branch NAME and stops at whitespace; a
+  # deliverable is a name plus enough words to search for — `normalizeVersion,
+  # a shared helper` — and cutting it at the first space would leave the half
+  # that identifies it.
+  #
+  # Presence is the value being non-empty, exactly as
+  # `waits:` does: a slice declaring nothing emits no key, so a consumer reads
+  # a deliverable or nothing and never a blank string that looks like one.
+  builds_note = ($0 ~ /<!--[ \t]*builds:[ \t]*/) ? marker_value($0, "builds") : ""
+  # WHICH KIND OF AGENT THIS SLICE NEEDS: `<!-- agent: reviewer -->`.
+  #
+  # `--agent <name>` was the only selector and only an operator could type it.
+  # `plot-registryd` hands a queued slice to a free agent with no `--agent`
+  # anywhere in the path, so an unattended fleet ran every slice as the same
+  # undifferentiated worker. The declaration has to live in the PLAN to reach a
+  # dispatch nobody is watching.
+  #
+  # PER-BRANCH, NEVER A `## Status` FIELD. Every Status field is plan-level, so
+  # one there could declare a single kind for a plan with several slices — and a
+  # reviewer slice beside an implementer slice is the population this is for.
+  #
+  # The value runs to the closing marker, the way `builds:` does and unlike
+  # `waits:`. A charter name is a bare word today, so both rules agree; this one
+  # is chosen because it does not silently truncate if a name grows a space.
+  #
+  # IT CANNOT VALIDATE ITS VALUE, and that is the difference from `waits:` above.
+  # A prerequisite has branch-prefix structure, which is what keeps a SYNTAX
+  # EXAMPLE in prose from reading as a declaration; a charter name is a bare word
+  # with no structure to check. What protects the templates instead is NESTING:
+  # their documentation sits inside an outer `<!-- ... -->` block, so the inner
+  # `agent:` carries no `<!--` of its own and this pattern never matches it —
+  # the same accident of shape that already keeps `builds:` out of the parse of
+  # a template. Documenting it as a bare `<!-- agent: reviewer -->` line would
+  # hand a kind to every plan created from that template. A test pins it.
+  #
+  # Presence is the value being non-empty, as all three
+  # annotations before it do: a slice naming no kind emits no key, so dispatch
+  # reads a name or nothing and never a blank string that looks like one.
+  agent_note = ($0 ~ /<!--[ \t]*agent:[ \t]*/) ? marker_value($0, "agent") : ""
+}
+# The commits a slice line names as its completion: `→ commit abc1234`,
+# `→ commit abc1234, def5678` and `→ owner/repo@abc1234`, the commit spellings of
+# `→ #N` and `→ owner/repo#N`. Returns them comma-joined, a cross-repo one keeping
+# its `owner/repo@` prefix because a reader must tell it apart. A commit is 7 or
+# more lowercase hex digits, so prose after the arrow is never read as one.
+function commit_list(s,   out, m, h) {
+  h = "[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]+"
+  while (match(s, "→ (commit " h "(, ?" h ")*|[A-Za-z0-9._-]+/[A-Za-z0-9._-]+@" h ")")) {
+    m = substr(s, RSTART, RLENGTH); s = substr(s, RSTART + RLENGTH)
+    sub(/^→ (commit )?/, "", m); gsub(/, ?/, ",", m)
+    out = out (out == "" ? "" : ",") m
+  }
+  return out
+}
+# Stores the annotations read_notes() found, and the commits the line names,
+# against branch n (named b), at the moment either dialect claims it.
+function keep_branch(n, b) {
+    # THE FLAG accepts the bare form as well as the annotated one.
+    #
+    # It matched `deferred:` only, so `<!-- deferred -->` — the annotation with
+    # nothing after it — read as NOT deferred at all: the strongest statement a
+    # plan can make about a branch, dropped for want of a colon. A reader
+    # writing the shorter form has said the branch will not be built; the
+    # parser now hears it.
+    deferred_of[n] = ($0 ~ /<!--[ \t]*(deferred|moved)[ \t]*(:|-->)/) ? "true" : "false"
+    # The reason travels with the flag. Empty on every non-deferred branch, and
+    # empty is also the honest answer for the bare form: the branch IS deferred
+    # and no reason was recorded, which is a different statement from a reason
+    # of "".
+    deferred_why[n] = defer_note
+    spike_of[n] = ($0 ~ /<!--[ \t]*spike[ \t]*-->/) ? 1 : 0
+    # Claim reflection, written by the worker after its ref push succeeds. This
+    # is a reflection, not the claim: git refs remain authoritative.
+    claimed_of[n] = claim_note
+    # The prerequisites travel with the branch, flattened as waits_of[n,1..k]
+    # since this awk has no nested arrays. Presence is tracked separately so a
+    # branch that declares none emits no key.
+    store_waits(n, b)
+    builds_of[n] = builds_note
+    # The kind travels with the branch, presence tracked separately so a slice
+    # declaring none emits no key.
+    agent_of[n] = agent_note
+    ordered_b[n] = b
+  commits_of[n] = commit_list($0)
 }
 # The longest wave name that still reads as a label, not prose. A JUDGEMENT, not
 # a measurement: the longest legitimate name in the estate is `Offered first`
@@ -1091,126 +1270,7 @@ section == "slices" && slice_shape != "heading" {
     note_branch_heading()
     next
   }
-  # Claim reflection, written by the worker after its ref push succeeds. This is
-  # a reflection, not the claim: git refs remain authoritative. Computed before
-  # the branch loop below — match() clobbers RSTART/RLENGTH, which that loop
-  # needs to advance.
-  claim_note = (index($0, "claimed:") > 0) ? marker_value($0, "claimed") : ""
-  # THE REASON FOR THE DEFERRAL, and not merely the fact of one.
-  #
-  # `<!-- deferred: verified already implemented 2026-08-17 — startRepair() at
-  # fleet.ts:806 -->` was tested for presence and the sentence after the colon
-  # was dropped on the floor. So the board could say `deferred` beside `no
-  # commits` and never say that the first is the REASON for the second — a
-  # reader with no access to the plan file saw a branch nobody started and no
-  # statement that nobody should.
-  #
-  # Extracted the same way and in the same place as the claim note, for the same
-  # reason: `match()` in the branch loop below clobbers RSTART/RLENGTH, so
-  # anything read from the whole line must be read before it runs.
-  #
-  # Newlines are already impossible here — awk hands this rule one line, and the
-  # documented contract is that an annotation binds to the line carrying the
-  # branch name. A deferral whose text is wrapped onto a continuation line is
-  # not seen, exactly as `deferred` itself was not.
-  # `moved:` IS THE SAME ANSWER AS `deferred:`, and CLAUDE.md has said so since
-  # the reconcile scan was written: *"`deferred:`/`moved:` in the plan means
-  # reapable"*. `plot-reconcile-scan.sh:504` matches both in one arm; this
-  # parser matched only the first, so a slice given up with the other word read
-  # as still outstanding — to the board, the delivery gate and the fleet alike.
-  # Measured 2026-09-04 on `feature/the-reaper-sweeps-every-kind`: annotated
-  # `moved:` into the slice that superseded it, still `deferred:false` here.
-  #
-  # The two words differ in what they tell a READER — given up, versus taken
-  # somewhere else — and the reason is kept verbatim, so the distinction is not
-  # lost by being read alike.
-  defer_note = (index($0, "deferred:") > 0 || index($0, "moved:") > 0) ? marker_value($0, "deferred|moved") : ""
-  # THE PREREQUISITES THIS BRANCH NAMES: `<!-- waits: bug/other-branch -->`.
-  #
-  # A LIST, not one name. Several `<!-- waits: … -->` comments on a line, or one
-  # `<!-- waits: x, y -->`, give the same list in document order, duplicates
-  # removed — see parse_waits(). The old greedy `sub()` took only the LAST
-  # annotation when a line carried two, which silently dropped every other
-  # prerequisite a slice had cleared for merge eligibility by itself (#1153).
-  #
-  # Each value is a BRANCH NAME, so it stops at the first whitespace or comma
-  # rather than running to the closing marker the way a deferral reason does: a
-  # reason is a sentence, a branch name is a token, and trailing prose inside
-  # the comment would silently become part of a name that then matches nothing.
-  #
-  # `deferred:` is a judgement and `waits:` is a checkable fact, so the two are
-  # separate annotations and both may sit on one line. Read here, beside the
-  # other two, for the same reason: `match()` in the branch loop below clobbers
-  # RSTART/RLENGTH, so anything read from the whole line must be read first.
-  #
-  # `has_waits` carries presence separately from the value, because ABSENT and
-  # EMPTY are different answers — a branch declaring no prerequisite emits no
-  # `waits_on` key at all, never `[]`.
-  #
-  # A value that does not look like a branch is NOT dropped — parse_waits()
-  # queues it in pending_unread_value[], and once the branch this line claims is
-  # known (below), it is copied into unread_waits_branch[]/unread_waits_value[].
-  # A line with no branch claim never drains the queue, so a `waits:` syntax
-  # example in prose — not on a branch line — stays silent, as today.
-  delete line_waits
-  has_waits = (parse_waits($0, line_waits) > 0)
-  # WHAT THIS SLICE BUILDS: `<!-- builds: normalizeVersion, a shared helper -->`.
-  #
-  # AN ANNOTATION, NOT A FIELD LINE, and that is what makes it work in BOTH
-  # slice dialects with no dialect-specific code. Annotations bind to the line
-  # carrying the branch name — the list item in one spelling, the `### `
-  # heading in the other — and both dialects already read `deferred:`,
-  # `claimed:` and `waits:` with the identical block. A `Builds:` field line
-  # would have had two spellings to parse, and the template writes the LIST
-  # dialect, so the heading-only version would be absent from every plan
-  # created from it.
-  #
-  # IT BELONGS TO THE SLICE, NEVER TO THE PLAN. A plan builds several things
-  # and each slice builds one; a plan-level list is searched as a whole and
-  # reported against the wrong slice.
-  #
-  # The value runs to the closing marker, the way `deferred:` does and unlike
-  # `waits:`. A prerequisite is a branch NAME and stops at whitespace; a
-  # deliverable is a name plus enough words to search for — `normalizeVersion,
-  # a shared helper` — and cutting it at the first space would leave the half
-  # that identifies it.
-  #
-  # `has_builds` carries presence separately from the value, exactly as
-  # `waits:` does: a slice declaring nothing emits no key, so a consumer reads
-  # a deliverable or nothing and never a blank string that looks like one.
-  builds_note = ($0 ~ /<!--[ \t]*builds:[ \t]*/) ? marker_value($0, "builds") : ""
-  has_builds = (builds_note != "")
-  # WHICH KIND OF AGENT THIS SLICE NEEDS: `<!-- agent: reviewer -->`.
-  #
-  # `--agent <name>` was the only selector and only an operator could type it.
-  # `plot-registryd` hands a queued slice to a free agent with no `--agent`
-  # anywhere in the path, so an unattended fleet ran every slice as the same
-  # undifferentiated worker. The declaration has to live in the PLAN to reach a
-  # dispatch nobody is watching.
-  #
-  # PER-BRANCH, NEVER A `## Status` FIELD. Every Status field is plan-level, so
-  # one there could declare a single kind for a plan with several slices — and a
-  # reviewer slice beside an implementer slice is the population this is for.
-  #
-  # The value runs to the closing marker, the way `builds:` does and unlike
-  # `waits:`. A charter name is a bare word today, so both rules agree; this one
-  # is chosen because it does not silently truncate if a name grows a space.
-  #
-  # IT CANNOT VALIDATE ITS VALUE, and that is the difference from `waits:` above.
-  # A prerequisite has branch-prefix structure, which is what keeps a SYNTAX
-  # EXAMPLE in prose from reading as a declaration; a charter name is a bare word
-  # with no structure to check. What protects the templates instead is NESTING:
-  # their documentation sits inside an outer `<!-- ... -->` block, so the inner
-  # `agent:` carries no `<!--` of its own and this pattern never matches it —
-  # the same accident of shape that already keeps `builds:` out of the parse of
-  # a template. Documenting it as a bare `<!-- agent: reviewer -->` line would
-  # hand a kind to every plan created from that template. A test pins it.
-  #
-  # `has_agent` carries presence separately from the value, as all three
-  # annotations before it do: a slice naming no kind emits no key, so dispatch
-  # reads a name or nothing and never a blank string that looks like one.
-  agent_note = ($0 ~ /<!--[ \t]*agent:[ \t]*/) ? marker_value($0, "agent") : ""
-  has_agent = (agent_note != "")
+  read_notes()
   # ONE LIST ITEM, AT MOST ONE CLAIM — an `if`, not the `while` this was.
   #
   # The old loop walked the line taking every backticked name on it, which is
@@ -1228,34 +1288,7 @@ section == "slices" && slice_shape != "heading" {
     if (n_waves == 0) { wave_names[++n_waves] = "" }
     wave_of[n_branches] = n_waves
     wave_seq[n_branches] = ++wave_count[n_waves]
-    # THE FLAG accepts the bare form as well as the annotated one.
-    #
-    # It matched `deferred:` only, so `<!-- deferred -->` — the annotation with
-    # nothing after it — read as NOT deferred at all: the strongest statement a
-    # plan can make about a branch, dropped for want of a colon. A reader
-    # writing the shorter form has said the branch will not be built; the
-    # parser now hears it.
-    deferred_of[n_branches] = ($0 ~ /<!--[ \t]*(deferred|moved)[ \t]*(:|-->)/) ? "true" : "false"
-    # The reason travels with the flag. Empty on every non-deferred branch, and
-    # empty is also the honest answer for the bare form: the branch IS deferred
-    # and no reason was recorded, which is a different statement from a reason
-    # of "".
-    deferred_why[n_branches] = defer_note
-    spike_of[n_branches] = ($0 ~ /<!--[ \t]*spike[ \t]*-->/) ? 1 : 0
-    # Claim reflection, written by the worker after its ref push succeeds. This
-    # is a reflection, not the claim: git refs remain authoritative.
-    claimed_of[n_branches] = claim_note
-    # The prerequisites travel with the branch, flattened as waits_of[n,1..k]
-    # since this awk has no nested arrays. Presence is tracked separately so a
-    # branch that declares none emits no key.
-    store_waits(n_branches, b)
-    builds_of[n_branches] = builds_note
-    builds_set[n_branches] = has_builds
-    # The kind travels with the branch, presence tracked separately so a slice
-    # declaring none emits no key.
-    agent_of[n_branches] = agent_note
-    agent_set[n_branches] = has_agent
-    ordered_b[n_branches] = b
+    keep_branch(n_branches, b)
   }
   line = $0
   # `→ #N` and `→ owner/repo#N` are both annotations: /plot-deliver instructs
@@ -1310,59 +1343,8 @@ section == "slices" && slice_shape == "heading" {
   wave_names[++n_waves] = wname
   note_branch_heading()
 
-  # Claim/deferral annotations bind to the line carrying the branch name, which
-  # is the heading. Read before any match() below, which clobbers RSTART/RLENGTH.
-  claim_note = (index($0, "claimed:") > 0) ? marker_value($0, "claimed") : ""
-  # `moved:` IS THE SAME ANSWER AS `deferred:`, and CLAUDE.md has said so since
-  # the reconcile scan was written: *"`deferred:`/`moved:` in the plan means
-  # reapable"*. `plot-reconcile-scan.sh:504` matches both in one arm; this
-  # parser matched only the first, so a slice given up with the other word read
-  # as still outstanding — to the board, the delivery gate and the fleet alike.
-  # Measured 2026-09-04 on `feature/the-reaper-sweeps-every-kind`: annotated
-  # `moved:` into the slice that superseded it, still `deferred:false` here.
-  #
-  # The two words differ in what they tell a READER — given up, versus taken
-  # somewhere else — and the reason is kept verbatim, so the distinction is not
-  # lost by being read alike.
-  defer_note = (index($0, "deferred:") > 0 || index($0, "moved:") > 0) ? marker_value($0, "deferred|moved") : ""
-  # WHAT THIS SLICE BUILDS: `<!-- builds: normalizeVersion, a shared helper -->`.
-  #
-  # AN ANNOTATION, NOT A FIELD LINE, and that is what makes it work in BOTH
-  # slice dialects with no dialect-specific code. Annotations bind to the line
-  # carrying the branch name — the list item in one spelling, the `### `
-  # heading in the other — and both dialects already read `deferred:`,
-  # `claimed:` and `waits:` with the identical block. A `Builds:` field line
-  # would have had two spellings to parse, and the template writes the LIST
-  # dialect, so the heading-only version would be absent from every plan
-  # created from it.
-  #
-  # IT BELONGS TO THE SLICE, NEVER TO THE PLAN. A plan builds several things
-  # and each slice builds one; a plan-level list is searched as a whole and
-  # reported against the wrong slice.
-  #
-  # The value runs to the closing marker, the way `deferred:` does and unlike
-  # `waits:`. A prerequisite is a branch NAME and stops at whitespace; a
-  # deliverable is a name plus enough words to search for — `normalizeVersion,
-  # a shared helper` — and cutting it at the first space would leave the half
-  # that identifies it.
-  #
-  # `has_builds` carries presence separately from the value, exactly as
-  # `waits:` does: a slice declaring nothing emits no key, so a consumer reads
-  # a deliverable or nothing and never a blank string that looks like one.
-  builds_note = ($0 ~ /<!--[ \t]*builds:[ \t]*/) ? marker_value($0, "builds") : ""
-  has_builds = (builds_note != "")
-  # The prerequisites, read exactly as the list-item spelling reads them — see
-  # parse_waits() and the comment at the list-item block for why the value is a
-  # list, why it stops at whitespace/comma, and how an unreadable value reaches
-  # unread_waits instead of being dropped.
-  delete line_waits
-  has_waits = (parse_waits($0, line_waits) > 0)
-  # The agent kind, read exactly as the list-item spelling reads it. Both
-  # dialects emit the same waves[], so a field added to one only would break that
-  # contract the first time a plan migrated. See the list-item block for why the
-  # value runs to the closing marker and why this one cannot validate itself.
-  agent_note = ($0 ~ /<!--[ \t]*agent:[ \t]*/) ? marker_value($0, "agent") : ""
-  has_agent = (agent_note != "")
+  # Annotations bind to the line carrying the branch name, which is the heading.
+  read_notes()
 
   # The branch is the `Branch:` value, matched against the known prefixes exactly
   # as the old shape matched the backticked name. Written unquoted in the heading
@@ -1376,26 +1358,14 @@ section == "slices" && slice_shape == "heading" {
   # the heading opened a wave and yielded nothing. The backticks are optional on
   # both sides and stripped from the name. Measured 2026-09-28 over 357 plans:
   # 2 records change, 355 byte-identical.
-  hmeta = $0
-  if (match(hmeta, "Branch:[ \t]*`?(" PREFIXES ")/[^ \t,)`]+`?")) {
-    b = substr(hmeta, RSTART, RLENGTH)
+  if (match($0, "Branch:[ \t]*`?(" PREFIXES ")/[^ \t,)`]+`?")) {
+    b = substr($0, RSTART, RLENGTH)
     sub(/^Branch:[ \t]*/, "", b)
     gsub(/`/, "", b)
     branches[++n_branches] = b
     wave_of[n_branches] = n_waves
     wave_seq[n_branches] = ++wave_count[n_waves]
-    # Bare `<!-- deferred -->` sets the flag with no reason, same as the old
-    # shape; `deferred:` carries the reason.
-    deferred_of[n_branches] = ($0 ~ /<!--[ \t]*(deferred|moved)[ \t]*(:|-->)/) ? "true" : "false"
-    deferred_why[n_branches] = defer_note
-    spike_of[n_branches] = ($0 ~ /<!--[ \t]*spike[ \t]*-->/) ? 1 : 0
-    claimed_of[n_branches] = claim_note
-    store_waits(n_branches, b)
-    builds_of[n_branches] = builds_note
-    builds_set[n_branches] = has_builds
-    agent_of[n_branches] = agent_note
-    agent_set[n_branches] = has_agent
-    ordered_b[n_branches] = b
+    keep_branch(n_branches, b)
   }
 
   # The PR is the `PR: #NNN` value in the heading. Absent PR: contributes
