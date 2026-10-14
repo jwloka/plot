@@ -64,6 +64,7 @@ import {
   agentsForReader,
   readerFrom,
   rowsForReader,
+  ticketsForReader,
   writeMineOnly,
 } from '../lib/agent-rows/mine-filter.js';
 import { ActivityEcho, ChangeMarks, type WatchedState, activeRowKeys, changedRows, groupPace } from '../lib/agent-rows/activity.js';
@@ -76,6 +77,7 @@ import { SLICE_LINKING_KINDS, groupBySlice, sliceLabel } from '../lib/agent-rows
 // it reads the fleet, decides the sections, and mounts the rows — the rows,
 // their marks and their menus are declared next door.
 import { ActivityMark } from '../lib/agent-rows/marks.js';
+import { waitingView } from '../lib/agent-rows/waiting-view.js';
 import { HeaderRow, IssueRowView, PlanLink, PlanRow, Row, SliceRow, RegistryRow, type AgentListProps } from '../lib/agent-rows/rows.js';
 import { workingAgentRows, brokenAgentRows, draftPlanRows } from '../lib/agent-rows/working-agents.js';
 import { DraftPlanRowView } from '../lib/agent-rows/draft-plan-row.js';
@@ -389,6 +391,8 @@ export function AgentList({
   // identity it filters against is the BOARD's, which arrives on a separate
   // fetch, so an unknown reader hides nothing rather than emptying the view.
   const [mineOnly, setMineOnly] = useState<boolean>(() => readMineOnly());
+  // THE *SHOW EVERY TICKET* CONTROL — client state only, off on every load.
+  const [showEveryTicket, setShowEveryTicket] = useState<boolean>(false);
   const toggleMineOnly = () => {
     setMineOnly((prev) => {
       const next = !prev;
@@ -667,14 +671,21 @@ export function AgentList({
   const visibleRows = rowsForReader(filteredRows, reader, mineOnly);
 
   // THE FILTERED ISSUES. Like rows, issues stay visible when no filter applies.
-  // Issue rows have no sprint field, so they always pass.
+  // Issue rows have no sprint field, so they always pass the sprint filter.
   //
-  // UNTOUCHED BY THE OWNERSHIP FILTER, and that is the rule rather than an
-  // omission: an unplanned issue carries no owner at all — `OwnedRow`'s `other`
-  // arm — so every issue reads as unknown and hiding none of them is what the
-  // rule already decides. Filtering them would need a second rule this branch
-  // does not own.
-  const filteredIssues = fleet.issues;
+  // `fleet.waiting.tickets` IS *WAITING ON YOU*'S OWN ROW SET — the domain's
+  // `waitingTickets` already applied its stricter default (hide and count an
+  // unassigned ticket) server-side. `ticketsForReader` is the separate, looser
+  // *Only my work* toggle on top of that: it hides a ticket only where it is
+  // someone else's, same as `rowsForReader` does for branch rows, and keeps an
+  // unassigned ticket or one whose source is unresolved. `fleet.waiting.source`
+  // is the wire form of the domain's `TicketSource`, resolved once server-side
+  // so this call needs no second host read. `fleet.issues` stays the fallback
+  // for an older server with no `waiting` field.
+  const waitingBlock = waitingView(fleet.waiting, fleet.issues, showEveryTicket, (tickets) =>
+    ticketsForReader(tickets, reader, fleet.waiting?.source ?? null, mineOnly),
+  );
+  const filteredIssues = waitingBlock.tickets;
 
   // HOW MANY WORKERS THE FILTER HIDES — `the-filter-does-not-hide-a-worker`,
   // slice Named. The WORKING section deliberately shows ALL live workers (a
@@ -2424,6 +2435,41 @@ export function AgentList({
               {/* The unplanned issues, AFTER the branches. Work already under
                   way outranks work nobody has committed to — the same
                   actionable-first ordering `GROUPS` applies one level up. */}
+              {/* WHAT THE SECTION HIDES, in the domain's sentences: the
+                  notice for an unmatched reader, the hidden count, and the
+                  control that lists every ticket. Every text comes from
+                  `waitingView`; nothing here decides. */}
+              {key === 'waiting-on-you' && fleet.issueAnswer === 'answered' && waitingBlock.notice !== null && (
+                <li
+                  role="row"
+                  data-waiting-notice
+                  className="border-t border-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                >
+                  <span role="gridcell">{waitingBlock.notice}</span>
+                </li>
+              )}
+              {key === 'waiting-on-you' && fleet.issueAnswer === 'answered' && waitingBlock.control !== null && (
+                <li
+                  role="row"
+                  data-waiting-hidden
+                  className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                >
+                  <span role="gridcell" className="flex flex-wrap items-center gap-2">
+                    {waitingBlock.hidden !== null && <span data-waiting-hidden-text>{waitingBlock.hidden}</span>}
+                    <label className="flex cursor-pointer items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        data-show-every-ticket
+                        checked={showEveryTicket}
+                        onChange={() => setShowEveryTicket((on) => !on)}
+                        className="h-3.5 w-3.5 accent-green-600"
+                      />
+                      <span className="font-medium text-slate-700 dark:text-slate-200">{waitingBlock.control}</span>
+                    </label>
+                    {waitingBlock.showing !== null && <span data-waiting-showing-text>{waitingBlock.showing}</span>}
+                  </span>
+                </li>
+              )}
               {issues.map((issue) => (
                 <IssueRowView
                   key={`issue-${issue.number}`}
