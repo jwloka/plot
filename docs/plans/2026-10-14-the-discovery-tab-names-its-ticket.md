@@ -34,17 +34,18 @@ One pure helper decides what the tab shows. `.tsx` renders its result and decide
 - **Composition.** The tag cloud (#1690) and *Show archived* apply to whichever groups show.
 - **Constraints.** No change to the payload, the issue index or the host reads, and no restart.
 
-### Open Questions
+### Decisions
 
-- [ ] Does a count include rows hidden behind *Show all done* (`moreCount`), or only the rows the lanes hold?
-- [ ] Does a hidden group keep its tag cloud matches in the cloud's own counts, or do those follow the visible group?
-- [ ] Does the parameter survive when *Show archived* re-fetches the board?
+- **A heading counts every row of its group,** the Done rows behind *Show all done* included, after the tag cloud's selection and the *Show archived* scope. Decided by the person on 2026-10-14.
+- **The tag cloud counts only the groups on screen.** The helper's result says which groups show, and the cloud's counts follow it (#1690's plan records the same decision).
+- **The parameter survives a reload,** including the re-fetch *Show archived* makes; `?show=` and `?archived=1` are written and read independently.
+- **Order.** This slice changes `StoriesTab.tsx` after the tag cloud's lanes slice, so it waits on `feature/the-lanes-filter-by-topic`, which itself waits on the ticket card slice.
 
 ## Slices
 
 ### Groups
 
-- `feature/the-discovery-groups-have-a-toggle` — a pure helper returns which groups show, their headings and their counts, `StoriesTab.tsx` renders the headings and the segmented control and keeps `?show=` in the URL, and a browser test switches through all three options and reloads with the parameter set <!-- builds: discoveryGroups, a pure helper for group visibility, headings and counts --> <!-- waits: feature/the-topics-name-their-tickets, feature/the-discovery-ticket-card-shows-its -->
+- `feature/the-discovery-groups-have-a-toggle` — a pure helper returns which groups show, their headings and their counts, `StoriesTab.tsx` renders the headings and the segmented control and keeps `?show=` in the URL, and a browser test switches through all three options and reloads with the parameter set <!-- builds: discoveryGroups, a pure helper for group visibility, headings and counts --> <!-- waits: feature/the-lanes-filter-by-topic -->
 
 ## Notes
 
