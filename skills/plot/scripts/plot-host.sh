@@ -439,6 +439,27 @@
 #                                 Actions, ekzweb is Bitbucket + Jenkins.
 #                                 Jenkins reports no limit, so it answers
 #                                 `predicted`.
+#   commit-status <sha> <state> <context> <description> <url>
+#                                 GITHUB ONLY. Writes a commit status via
+#                                 `POST /repos/{owner}/{repo}/statuses/{sha}`,
+#                                 authenticated as a GitHub App installation —
+#                                 NOT the signed-in `gh` user — so the review
+#                                 verdict carries its own identity rather than
+#                                 whoever's laptop ran this. The App ID and a
+#                                 path to its private key come from the
+#                                 `Review app` config key (`<app id> <key
+#                                 path>`, read via plot-config.sh); a relative
+#                                 key path resolves against the repository
+#                                 root. EXIT 4, naming the key, where `Review
+#                                 app` is absent or its key file cannot be
+#                                 read — a configuration gap, not a transient:
+#                                 this script mints no token against a default
+#                                 App and asks no `gh`-signed-in identity in
+#                                 its place. `state` is one of GitHub's own
+#                                 words (success|failure|error|pending);
+#                                 `context` groups repeat statuses on one sha
+#                                 (this estate's caller passes `plot/review`).
+#                                 A call that reaches the API and fails exits 3.
 #
 # TRANSPORT IS NOT A CALLER'S CONCERN. Where a host offers a question over more
 # than one transport — GitHub's REST against its GraphQL — the choice is made
@@ -5230,7 +5251,18 @@ case "$op" in
       '{connector:$connector,account:$account,bucket:$bucket} + .' <<<"$_sr_rate"
     ;;
 
+  commit-status)
+    # GITHUB ONLY: a non-GitHub backend exits 4, the "cannot be asked" code
+    # `account`'s Bitbucket arm uses. plot-commit-status.mjs holds the App
+    # logic; `--check` refuses a missing argument (1) or a missing or
+    # unreadable `Review app` key (4) before `gh` or the network is asked.
+    # The JWT and the installation token never reach a child process's argv.
+    [ "$be" = "github" ] || { echo "plot-host: commit-status — backend is '$be', not github; this op is GitHub-only" >&2; exit 4; }
+    node "$here/plot-commit-status.mjs" --check "$@" || exit $?
+    node "$here/plot-commit-status.mjs" --repo "$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)" "$@" || exit $?
+    ;;
+
   *)
-    die "unknown op '$op' (backend|default-branch|pr-state|pr-create|pr-merge|pr-list|issue-list|issue-view|issue-status|issue-open|pr-body|rate-limit|limit|ci-limit|spend-rate)"
+    die "unknown op '$op' (backend|default-branch|pr-state|pr-create|pr-merge|pr-list|issue-list|issue-view|issue-status|issue-open|pr-body|rate-limit|limit|ci-limit|spend-rate|commit-status)"
     ;;
 esac
