@@ -34,17 +34,17 @@ Every text and state on the card comes from a domain property or a pure tested h
 
 Scope limit: only data the board already carries. The card shows no labels and no author. This needs no change to `plot-host.sh`, the issue index or the schema.
 
-### Open Questions
+### Decisions
 
-- [ ] Where does the repository or tracker reference come from? `TicketLaneRow` has `id` and `url` but no repository name. The helper may derive it from the URL, or the board may already carry the repository on another field. Read before the slice starts.
-- [ ] `CreatePlanButton` and `CreateStoryButton` take an `IssueRow`. Does a `TicketLaneRow` satisfy it, or does the card map one to the other in the helper?
-- [ ] Does the *In progress* lane show the actions? The issue says "open tickets only". Proposed: *Open* and *In progress* show them, *Done* does not.
+- **The reference comes from the ticket URL.** `TicketLaneRow` carries no repository name, so the helper derives the reference from `url`: a git-host issue URL gives `owner/repo#number`, a Jira browse URL gives the issue key. A URL the helper cannot read gives the shorthand alone, never an invented reference.
+- **The helper maps the row for the buttons.** `CreatePlanButton` and `CreateStoryButton` take an `IssueRow`. The card helper maps the `TicketLaneRow` to the fields those buttons read, so `TicketRowView` passes the mapped row and decides nothing.
+- **Open and In progress tickets show the actions.** Both lanes hold tickets that are open on the tracker; only the *Done* lane shows no action. Decided by the person on 2026-10-14.
 
 ## Slices
 
 ### Ticket card
 
-- `feature/the-discovery-ticket-card-shows-its` — the card helper in the domain with unit tests, `TicketRowView` rendering it, and a browser test showing the card and both actions on an open ticket and no action on a Done ticket. <!-- builds: ticketCard, a pure helper for the Discovery ticket card's prefix, reference, age and actions -->
+- `feature/the-discovery-ticket-card-shows-its` — the card helper in the domain with unit tests, `TicketRowView` rendering it, and a browser test showing the card and both actions on an Open and an In progress ticket and no action on a Done ticket. <!-- builds: ticketCard, a pure helper for the Discovery ticket card's prefix, reference, age and actions -->
 
 ## Notes
 
