@@ -1,0 +1,1 @@
+../2026-10-14-the-discovery-ticket-card-shows-its.md
