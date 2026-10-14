@@ -278,7 +278,7 @@ The GitHub closed read reuses the open arm's `gh_state` (`:4730`) and adds no ar
 
 ### The Jira project scope
 
-- `feature/the-lanes-read-the-whole-jira-project` <!-- waits: feature/the-delivery-tab-filters-by-sprint-and-owner --> — the Jira lanes read drops `assignee = currentUser()` where `Ticket prefixes` is declared and keeps today's query where it is not; the D23 inbox read, skipped where `Ticket prefixes` is absent, and the index's `inbox` rows; `PLOT_JIRA_JQL` on the inbox read; the Jira slice passes the `inbox` rows to `waitingTickets` and chooses nothing, since the rule and the union belong to `the-board-has-three-tabs`; the three `Ticket prefixes` doc sites; the contract tests; the lines *The shell lines* names for this slice, net about 0 <!-- builds: the project-wide Jira reads and the D23 inbox read -->
+- `feature/the-lanes-read-the-whole-jira-project` <!-- waits: feature/the-delivery-tab-filters-by-sprint-and-owner --> → #1687 — the Jira lanes read drops `assignee = currentUser()` where `Ticket prefixes` is declared and keeps today's query where it is not; the D23 inbox read, skipped where `Ticket prefixes` is absent, and the index's `inbox` rows; `PLOT_JIRA_JQL` on the inbox read; the Jira slice passes the `inbox` rows to `waitingTickets` and chooses nothing, since the rule and the union belong to `the-board-has-three-tabs`; the three `Ticket prefixes` doc sites; the contract tests; the lines *The shell lines* names for this slice, net about 0 <!-- builds: the project-wide Jira reads and the D23 inbox read -->
 
 ## Notes
 
