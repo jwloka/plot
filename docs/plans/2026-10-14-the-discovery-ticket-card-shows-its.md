@@ -10,6 +10,7 @@
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-14, Jan Wloka, plan-PR #1691 merged
+- **Started:** 2026-10-14, jwloka, `feature/the-discovery-ticket-card-shows-its`
 
 ## Changelog
 
