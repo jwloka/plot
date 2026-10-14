@@ -48,7 +48,7 @@ One pure domain function computes the topic set and the matches. The server call
 
 ### Topics
 
-- `feature/the-topics-name-their-tickets` — a pure domain function builds topics from stories and tickets, each naming its stories and tickets, and `board.ts` sends it <!-- builds: extractTopics over stories and tickets, topics naming ticketKeys -->
+- `feature/the-topics-name-their-tickets` — a pure domain function builds topics from stories and tickets, each naming its stories and tickets, and `board.ts` sends it <!-- builds: extractTopics over stories and tickets, topics naming ticketKeys --> → #1699
 
 ### Lanes
 
