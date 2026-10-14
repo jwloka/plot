@@ -10,6 +10,7 @@
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-14, Jan Wloka, plan-PR #1694 merged
+- **Started:** 2026-10-14, Jan Wloka, `feature/the-discovery-groups-have-a-toggle`
 
 ## Changelog
 
