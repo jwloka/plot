@@ -34,11 +34,13 @@ One pure domain function computes the topic set and the matches. The server call
 - **Count.** A topic's `count` sums the stories and tickets it matches. The chip title names both numbers.
 - **Constraints.** No change to `plot-host.sh`, the index or its schema, and no restart.
 
-### Open Questions
+### Decisions
 
-- [ ] Where does the story file text come from? `extractTopics` receives `StoryDocument` with a title and plan titles only. Does the board already read the story file body, or does the slice add that read?
-- [ ] How does ticket text weigh against story text in `count`, and does a topic present in every story but only some tickets still qualify? The "all rows" rule has to name its denominator.
-- [ ] Does a ticket title yield compound terms and bigrams the way a plan title does, or single words only?
+- **Story text is the story file the board already reads.** The topics slice reads the story file text through the same read the story page uses, and passes it beside the title and plan titles. No new file read path is added.
+- **The "every row" rule counts stories and tickets together.** A topic that appears in every story and every ticket is dropped; a topic in every story but only some tickets stays. A topic's `count` is its matching stories plus its matching tickets.
+- **A ticket title yields terms as a plan title does,** compound terms included.
+- **The cloud counts only the groups on screen.** When the Discovery toggle (#1693) shows one group, a chip counts that group's matches, and a topic found only in the hidden group leaves the cloud. Decided by the person on 2026-10-14; the toggle slice passes which groups show.
+- **Order.** The lanes slice changes `StoriesTab.tsx`, so it waits on the ticket card slice (`feature/the-discovery-ticket-card-shows-its`), and the toggle slice waits on it.
 
 ## Slices
 
@@ -48,7 +50,7 @@ One pure domain function computes the topic set and the matches. The server call
 
 ### Lanes
 
-- `feature/the-lanes-filter-by-topic` — a pure function narrows story and ticket lanes by the selected topic, `StoriesTab.tsx` renders it with the empty-lane message, and a browser test selects a topic matching a ticket and a story and sees both lanes narrow <!-- builds: lanesForTopic, a pure lane filter --> <!-- waits: feature/the-topics-name-their-tickets -->
+- `feature/the-lanes-filter-by-topic` — a pure function narrows story and ticket lanes by the selected topic, `StoriesTab.tsx` renders it with the empty-lane message, and a browser test selects a topic matching a ticket and a story and sees both lanes narrow <!-- builds: lanesForTopic, a pure lane filter --> <!-- waits: feature/the-topics-name-their-tickets, feature/the-discovery-ticket-card-shows-its -->
 
 ## Notes
 
