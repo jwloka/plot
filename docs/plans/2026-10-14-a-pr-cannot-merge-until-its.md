@@ -13,6 +13,7 @@
 - **Started:** 2026-10-14, Jan Wloka, `feature/a-pr-cannot-merge-until-its-host-op`
 - **Started:** 2026-10-14, Jan Wloka, `feature/a-pr-cannot-merge-until-its-review-command`
 - **Started:** 2026-10-14, Jan Wloka, `feature/a-pr-cannot-merge-until-its-bitbucket`
+- **Started:** 2026-10-14, Jan Wloka, `docs/a-pr-cannot-merge-until-its-branch-rule`
 
 ## Changelog
 
