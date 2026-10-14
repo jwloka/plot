@@ -47,7 +47,7 @@ One pure helper decides what the tab shows. `.tsx` renders its result and decide
 
 ### Groups
 
-- `feature/the-discovery-groups-have-a-toggle` — a pure helper returns which groups show, their headings and their counts, `StoriesTab.tsx` renders the headings and the segmented control and keeps `?show=` in the URL, and a browser test switches through all three options and reloads with the parameter set <!-- builds: discoveryGroups, a pure helper for group visibility, headings and counts --> <!-- waits: feature/the-lanes-filter-by-topic -->
+- `feature/the-discovery-groups-have-a-toggle` — a pure helper returns which groups show, their headings and their counts, `StoriesTab.tsx` renders the headings and the segmented control and keeps `?show=` in the URL, and a browser test switches through all three options and reloads with the parameter set → #1718 <!-- builds: discoveryGroups, a pure helper for group visibility, headings and counts --> <!-- waits: feature/the-lanes-filter-by-topic -->
 
 ## Notes
 
