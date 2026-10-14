@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
@@ -16,6 +16,7 @@
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-fleet-commissions-the-spec`
 - **Started:** 2026-10-14, Jan Wloka, `feature/commission-design-is-removed`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-board-shows-the-spec-run`
+- **Delivered:** 2026-10-14
 
 ## Changelog
 
