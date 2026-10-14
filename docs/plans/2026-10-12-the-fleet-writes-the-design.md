@@ -140,7 +140,7 @@ fleetd folds a `start` mark by clearing the plan's failure record and `declined`
 
 ### The button goes
 
-- `feature/commission-design-is-removed` — every site listed under *Removing Commission design*, including the comments, `DESIGN-phases.md:40` and `:143`, `agent-log.test.ts` and `commission` out of `SITES`; `commission` leaves both lists at `CLAUDE.md:502`, and `AGENTS.md` follows <!-- builds: the removal of Commission design -->
+- `feature/commission-design-is-removed` → #1695 — every site listed under *Removing Commission design*, including the comments, `DESIGN-phases.md:40` and `:143`, `agent-log.test.ts` and `commission` out of `SITES`; `commission` leaves both lists at `CLAUDE.md:502`, and `AGENTS.md` follows <!-- builds: the removal of Commission design -->
 
 ### The spec rows
 
