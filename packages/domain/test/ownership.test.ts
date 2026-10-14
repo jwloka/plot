@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { ownership, isMine, parsePersonDirectory, type OwnedRow, type Reader } from '../src/index.js';
+import {
+  ownership, isMine, parsePersonDirectory, ticketSourceOf, type OwnedRow, type Reader, type TicketSource,
+} from '../src/index.js';
+import { TICKET_SOURCES } from '../src/adapters/tracker/tracker-listers.js';
 
 /**
  * Whose a row is, and whether a filter to the reader's work keeps it.
@@ -182,5 +185,107 @@ describe('isMine keeps what it cannot classify', () => {
     expect(isMine({ kind: 'other' }, declared)).toBe(true);
     expect(isMine(plan(''), declared)).toBe(true);
     expect(isMine(pr(''), declared)).toBe(true);
+  });
+});
+
+describe('ticketSourceOf maps an IssueSource and a resolved backend to a TicketSource', () => {
+  it('reads a tracker asking jira as jira', () => {
+    expect(ticketSourceOf({ ask: 'tracker', scheme: 'jira' }, 'github', TICKET_SOURCES))
+      .toEqual({ service: 'jira', match: 'tracker-account', prefix: 'jira:' });
+  });
+
+  it('reads a tracker asking github-issues as github', () => {
+    expect(ticketSourceOf({ ask: 'tracker', scheme: 'github-issues' }, 'github', TICKET_SOURCES))
+      .toEqual({ service: 'github', match: 'host-login' });
+  });
+
+  it('reads a git-host source with a github backend as github', () => {
+    expect(ticketSourceOf({ ask: 'git-host' }, 'github', TICKET_SOURCES))
+      .toEqual({ service: 'github', match: 'host-login' });
+  });
+
+  it('reads a git-host source with a bitbucket backend as bitbucket', () => {
+    expect(ticketSourceOf({ ask: 'git-host' }, 'bitbucket', TICKET_SOURCES))
+      .toEqual({ service: 'bitbucket', match: 'host-login' });
+  });
+
+  it('answers null for a git-host source with an unresolved backend', () => {
+    expect(ticketSourceOf({ ask: 'git-host' }, 'gitlab', TICKET_SOURCES)).toBeNull();
+    expect(ticketSourceOf({ ask: 'git-host' }, '', TICKET_SOURCES)).toBeNull();
+  });
+
+  it('answers null for a tracker scheme no lister describes', () => {
+    expect(ticketSourceOf({ ask: 'tracker', scheme: 'youtrack' }, 'github', TICKET_SOURCES)).toBeNull();
+    expect(ticketSourceOf({ ask: 'tracker', scheme: 'mute' }, 'github', { listers: [{ scheme: 'mute' }], hosts: [] }))
+      .toBeNull();
+  });
+
+  it('answers null for a source nobody answers', () => {
+    expect(ticketSourceOf({ ask: 'nobody', reason: 'no connector' }, 'github', TICKET_SOURCES)).toBeNull();
+  });
+});
+
+describe('a ticket is owned by its assignees, resolved by source', () => {
+  const github: TicketSource = { service: 'github', match: 'host-login' };
+  const jira: TicketSource = { service: 'jira', match: 'tracker-account', prefix: 'jira:' };
+  const ticket = (assignees: string[], source: TicketSource | null = github): OwnedRow => ({
+    kind: 'ticket',
+    assignees,
+    source,
+  });
+
+  it('reads a GitHub assignee equal to an undeclared reader login as mine', () => {
+    expect(ownership(ticket(['jwloka']), reader)).toBe('mine');
+  });
+
+  it('reads a second of two assignees equal to the reader as mine', () => {
+    expect(ownership(ticket(['maemisegger', 'jwloka']), reader)).toBe('mine');
+  });
+
+  it('reads another declared person as theirs', () => {
+    expect(ownership(ticket(['eins78']), declared)).toBe('theirs');
+    expect(isMine(ticket(['eins78']), declared)).toBe(false);
+  });
+
+  it('reads [] as unknown, and isMine keeps it', () => {
+    expect(ownership(ticket([]), reader)).toBe('unknown');
+    expect(isMine(ticket([]), reader)).toBe(true);
+  });
+
+  it('reads a Jira assignee named by a jira: spelling of the reader\'s handle as mine', () => {
+    const jiraDirectory = parsePersonDirectory('jwloka = jira:jan.wloka@quatico.com');
+    const jiraReader: Reader = { hostUser: 'jwloka', directory: jiraDirectory };
+    expect(ownership(ticket(['jan.wloka@quatico.com'], jira), jiraReader)).toBe('mine');
+  });
+
+  it('reads a Jira assignee named by a jira: spelling of another handle as theirs', () => {
+    const jiraDirectory = parsePersonDirectory(
+      'jwloka = jira:jan.wloka@quatico.com; eins78 = jira:max.albrecht@quatico.com',
+    );
+    const jiraReader: Reader = { hostUser: 'jwloka', directory: jiraDirectory };
+    expect(ownership(ticket(['max.albrecht@quatico.com'], jira), jiraReader)).toBe('theirs');
+  });
+
+  it('reads a ticket whose source is unresolved as unknown', () => {
+    expect(ownership(ticket(['jwloka'], null), reader)).toBe('unknown');
+    expect(ownership({ kind: 'ticket', assignees: ['jwloka'] }, reader)).toBe('unknown');
+    expect(ownership({ kind: 'ticket', source: github }, reader)).toBe('unknown');
+  });
+
+  it('reads a ticket as unknown where the reader has no comparable login', () => {
+    expect(ownership(ticket(['jwloka']), { hostUser: '' })).toBe('unknown');
+    expect(ownership(ticket(['jan.wloka@quatico.com'], jira), { hostUser: 'jan.wloka@quatico.com' })).toBe('unknown');
+  });
+
+  it('skips a blank assignee, and reads only blanks as unknown', () => {
+    expect(ownership(ticket(['  ', 'jwloka']), reader)).toBe('mine');
+    expect(ownership(ticket(['  ']), reader)).toBe('unknown');
+  });
+
+  it('reads a Jira assignee named by no handle as unknown', () => {
+    const jiraDirectory = parsePersonDirectory('jwloka = jira:jan.wloka@quatico.com');
+    const jiraReader: Reader = { hostUser: 'jwloka', directory: jiraDirectory };
+    expect(ownership(ticket(['5b10ac8d82e05b22cc7d4ef5'], jira), jiraReader)).toBe('unknown');
+    expect(ownership(ticket(['jan.wloka@quatico.com'], jira), { hostUser: 'jwloka' })).toBe('unknown');
   });
 });
