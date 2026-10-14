@@ -46,7 +46,7 @@ Scope limit: only data the board already carries. The card shows no labels and n
 
 ### Ticket card
 
-- `feature/the-discovery-ticket-card-shows-its` — the card helper in the domain with unit tests, `TicketRowView` rendering it, and a browser test showing the card and both actions on an Open and an In progress ticket and no action on a Done ticket. <!-- builds: ticketCard, a pure helper for the Discovery ticket card's prefix, reference, age and actions -->
+- `feature/the-discovery-ticket-card-shows-its` — the card helper in the domain with unit tests, `TicketRowView` rendering it, and a browser test showing the card and both actions on an Open and an In progress ticket and no action on a Done ticket. <!-- builds: ticketCard, a pure helper for the Discovery ticket card's prefix, reference, age and actions --> → #1707
 
 ## Notes
 
