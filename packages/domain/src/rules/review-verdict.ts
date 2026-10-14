@@ -1,0 +1,131 @@
+/** The severity counts a reviewer's verdict file states. */
+export interface ReviewCounts {
+  high: number;
+  medium: number;
+  low: number;
+}
+
+/** What `reviewVerdict` answers: the counts, or the reason the file is refused. */
+export type ReviewVerdict =
+  | { read: 'counted'; counts: ReviewCounts }
+  | { read: 'refused'; why: string };
+
+const COUNT_LINE = /^Findings:/;
+const COUNT_SHAPE = /^Findings: HIGH (\d+), MEDIUM (\d+), LOW (\d+)\s*$/;
+
+/**
+ * Reads the severity counts from a reviewer's verdict file.
+ *
+ * The file must hold exactly one line starting `Findings:`, and that line must
+ * read `Findings: HIGH <n>, MEDIUM <n>, LOW <n>` with each `<n>` a
+ * non-negative integer. Nothing else in the file is interpreted.
+ *
+ * @param text - the verdict file's contents.
+ * @returns the counts, or a refusal naming what is wrong: no such line, more
+ *   than one, or a line whose counts are not integers in that order.
+ */
+export const reviewVerdict = (text: string): ReviewVerdict => {
+  const lines = text.split(/\r?\n/).filter((line) => COUNT_LINE.test(line));
+  if (lines.length === 0) return { read: 'refused', why: 'no "Findings:" line' };
+  if (lines.length > 1) return { read: 'refused', why: `${lines.length} "Findings:" lines, expected one` };
+
+  const match = COUNT_SHAPE.exec(lines[0]!);
+  if (match === null) {
+    return { read: 'refused', why: `"Findings:" line is not "Findings: HIGH <n>, MEDIUM <n>, LOW <n>": ${lines[0]}` };
+  }
+  const [high, medium, low] = [match[1]!, match[2]!, match[3]!].map(Number) as [number, number, number];
+  if (![high, medium, low].every(Number.isSafeInteger)) {
+    return { read: 'refused', why: `"Findings:" count out of range: ${lines[0]}` };
+  }
+  return { read: 'counted', counts: { high, medium, low } };
+};
+
+/** What a review request names about one pull request. */
+export interface ReviewRequest {
+  pr: number;
+  headSha: string;
+  base: string;
+}
+
+/**
+ * The fixed review-request block appended to the reviewer charter's prompt.
+ *
+ * @param request - the pull request, its head and its base branch.
+ * @returns the block: the PR facts, the severity rubric, the read-only rule, and
+ *   the instruction to end the final answer with the one `Findings:` line.
+ */
+export const reviewRequestBlock = (request: ReviewRequest): string =>
+  [
+    'Review request',
+    `Pull request: #${request.pr}`,
+    `Head commit: ${request.headSha}`,
+    `Base branch: ${request.base}`,
+    '',
+    'Review the change between the base branch and the head commit. The working tree is checked out at the head commit.',
+    '',
+    'Severity:',
+    '- HIGH: a security leak, a wrong result users hit, or a break of main or of merges.',
+    '- MEDIUM: a defect that does not meet the HIGH bar.',
+    '- LOW: a style or maintainability point.',
+    '',
+    'Read-only: your tools read and search files and do nothing else. Write no file.',
+    '',
+    'Give your verdict as your final answer. List each finding with its severity, then end with exactly one line:',
+    'Findings: HIGH <n>, MEDIUM <n>, LOW <n>',
+  ].join('\n');
+
+/** The only tools the reviewer's harness offers it: read and search. */
+export const REVIEWER_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob'];
+
+/** The tools the reviewer's harness removes by name as well, in case a harness build ignores the tool list. */
+export const REVIEWER_DENY: readonly string[] = [
+  'Write', 'Edit', 'NotebookEdit', 'Bash', 'Agent', 'Task', 'WebFetch', 'WebSearch',
+];
+
+/** A model or effort word the reviewer command accepts; it is single-quoted into the command. */
+const COMMAND_WORD = /^[A-Za-z0-9._:[\]-]+$/;
+
+/** What `reviewerCommand` answers: the shell fragment, or the reason none is built. */
+export type ReviewerCommand = { read: 'command'; command: string } | { read: 'refused'; why: string };
+
+/**
+ * The shell fragment that runs the reviewer read-only, for the `command`
+ * agent runner. The prompt follows it as an argument.
+ *
+ * The fragment runs `claude -p` with only {@link REVIEWER_TOOLS}, removes
+ * {@link REVIEWER_DENY} by name, loads user settings only (`--setting-sources
+ * user`, so no hook or permission rule from the reviewed tree applies),
+ * denies every permission the settings do not grant (`--permission-mode
+ * dontAsk`), and loads no MCP server (`--strict-mcp-config`). It never names
+ * `bypassPermissions`.
+ *
+ * @param charter - the reviewer charter's harness, model and effort.
+ * @returns the fragment, or a refusal for a harness other than `claude` or a
+ *   model or effort word outside `[A-Za-z0-9._:[\]-]`.
+ */
+export const reviewerCommand = (charter: { harness: string; model: string; effort: string }): ReviewerCommand => {
+  if (charter.harness !== '' && charter.harness !== 'claude') {
+    return { read: 'refused', why: `the reviewer runs read-only on claude only; the charter names harness '${charter.harness}'` };
+  }
+  for (const [key, value] of [['model', charter.model], ['effort', charter.effort]] as const) {
+    if (value !== '' && !COMMAND_WORD.test(value)) {
+      return { read: 'refused', why: `the charter's ${key} '${value}' is not a single word` };
+    }
+  }
+  const command = [
+    'claude',
+    '-p',
+    ...(charter.model === '' ? [] : ['--model', `'${charter.model}'`]),
+    ...(charter.effort === '' ? [] : ['--effort', `'${charter.effort}'`]),
+    '--tools',
+    REVIEWER_TOOLS.join(','),
+    '--disallowedTools',
+    REVIEWER_DENY.join(','),
+    '--setting-sources',
+    'user',
+    '--permission-mode',
+    'dontAsk',
+    '--strict-mcp-config',
+  ].join(' ');
+  return { read: 'command', command };
+};
