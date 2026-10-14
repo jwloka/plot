@@ -4,13 +4,14 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Issue:** #1690
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-14, Jan Wloka, plan-PR #1692 merged
 - **Started:** 2026-10-14, jwloka, `feature/the-topics-name-their-tickets`
+- **Delivered:** 2026-10-14
 
 ## Changelog
 
