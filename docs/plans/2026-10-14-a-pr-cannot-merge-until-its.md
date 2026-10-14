@@ -79,7 +79,7 @@ Decided by the person on 2026-10-14.
 ### Implementation
 
 - `feature/a-pr-cannot-merge-until-its-review-command` — the `plot-review` entry point that reviews a PR head, files the follow-up issue and writes the status → #1709 <!-- builds: plot-review, a command that reviews a PR and writes plot/review --> <!-- agent: reviewer -->
-- `feature/a-pr-cannot-merge-until-its-bitbucket` — the Bitbucket arm of `commit-status`, or `unsupported` by name, with the corpus test holding both backends' answers
+- `feature/a-pr-cannot-merge-until-its-bitbucket` — the Bitbucket arm of `commit-status`, or `unsupported` by name, with the corpus test holding both backends' answers → #1711
 
 ### Rollout
 
