@@ -51,19 +51,25 @@ Plot's own principle applies (CLAUDE.md, *Gates Over Rules*): can you answer "di
 
 Open for the reader: whether these writes are exemptions a status states or a second required-check list. The proposal keeps one required context, so the rule has one place to check.
 
+### Decisions
+
+Decided by the person on 2026-10-14.
+
+- **A GitHub App writes the status.** A status written with the maintainer's token is indistinguishable from one written by hand, so it would stop accidents and not a person or tool that holds that login. The status is therefore written by a dedicated GitHub App (permissions: *Commit statuses: write*, *Pull requests: read*, *Contents: read*), installed on the repository. Only the review command holds the App's private key: a key file outside the repository, named by a Plot Config key (for example `Review app: <app id> <key path>`). `plot-host.sh commit-status` mints a short-lived installation token from the App ID and key and writes the status with it. The branch rule requires `plot/review` **from that App** (a ruleset's required status check pinned to the App's integration ID), so a status written with any other token does not satisfy it. A person creates and installs the App once; the rollout slice documents the steps.
+- **Every PR.** Every merge into `main` needs a passing `plot/review`, including a PR a person opens by hand.
+- **Break-glass is an admin merge with a recorded reason.** The maintainer may merge past a stuck or wrong review as an admin, and records the reason on the PR as a comment starting `review-bypass:`. `/plot-reconcile` reports every PR merged into `main` with no passing `plot/review` and no such comment, so a bypass without a reason is visible.
+- **Full re-review per head.** A fix push moves the head and gets a full review, as the rule "one full review per PR" states for the final head. Pushes per PR are measured after rollout; a scoped re-check is added only if the cost shows.
+- **The Bitbucket arm uses its own identity.** A GitHub App does not exist on Bitbucket; the Bitbucket arm writes the build status with a dedicated account's app password named by the same config key, or answers `unsupported` by name.
+
 ### Open Questions
 
 - [ ] Does Bitbucket Server and Cloud expose the same merge-check shape, or does one answer `unsupported`? Measure on both before the Bitbucket arm is written.
-- [ ] Who is the status's author on GitHub? A commit status written by the maintainer's token is indistinguishable from a hand-written one, so the gate stops accidents and does not stop a person who runs `gh api` with that token. Name the identity (a GitHub App or a dedicated bot account) or accept the limit in writing.
-- [ ] Review cost: one full review per push to a PR in review multiplies cost on a PR with many fix pushes. Measure the pushes per PR over the last 50 merged PRs before choosing between full re-review and scoped re-check.
-- [ ] Does the rule apply to PRs with `ai-generated` fleet authors only, or to every PR? The issue says every PR; confirm.
-- [ ] Break-glass: the maintainer needs a recorded way past a stuck review (admin merge with a stated reason) without turning the gate back into a rule.
 
 ## Slices
 
 ### Tracer
 
-- `feature/a-pr-cannot-merge-until-its-host-op` — `plot-host.sh commit-status` on GitHub and the `Host` port question, proven by writing `plot/review` on a scratch PR head <!-- builds: commit-status, a plot-host.sh op that writes a commit status -->
+- `feature/a-pr-cannot-merge-until-its-host-op` — `plot-host.sh commit-status` on GitHub, writing with an installation token minted from the review App's ID and key (the `Review app` config key), and the `Host` port question; proven by writing `plot/review` on a scratch PR head, and by a refusal naming the missing key when none is configured <!-- builds: commit-status, a plot-host.sh op that writes a commit status -->
 
 ### Implementation
 
@@ -72,7 +78,7 @@ Open for the reader: whether these writes are exemptions a status states or a se
 
 ### Rollout
 
-- `docs/a-pr-cannot-merge-until-its-branch-rule` — the controllers and the release step write their own status, and the docs state the branch rule for this repository and for adopting repositories
+- `docs/a-pr-cannot-merge-until-its-branch-rule` — the controllers and the release step write their own status; `/plot-reconcile` reports a PR merged with no passing `plot/review` and no `review-bypass:` comment; the docs give the person's one-time steps (create and install the App, store its key, add the ruleset requiring `plot/review` from the App) for this repository and for adopting repositories
 
 ## Notes
 
