@@ -14,6 +14,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-fleet-dispatches-an-approved-spike`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-fleet-reads-design-work`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-fleet-commissions-the-spec`
+- **Started:** 2026-10-14, Jan Wloka, `feature/commission-design-is-removed`
 
 ## Changelog
 
