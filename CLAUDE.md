@@ -103,6 +103,7 @@ Plot dog-foods its own config mechanism. Helpers read these via `skills/plot/scr
 - **Auto-verify:** false
 - **Design command:** PLOT_UNATTENDED=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 claude -p --model sonnet ${PLOT_AGENT_SETTINGS:+--settings "$PLOT_AGENT_SETTINGS"} --permission-mode bypassPermissions
 - **Auto-design:** false
+- **Review app:** 5317669 /Users/jwloka/.config/plot/plot-review.5317669.private-key.pem
 
 <!-- `Implement command` runs `/plot-implement <slug>` for the board's
      `Implement` control and for `WriteBriefButton`, which is the same route
