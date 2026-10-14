@@ -4,13 +4,14 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Issue:** #1689
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-14, Jan Wloka, plan-PR #1691 merged
 - **Started:** 2026-10-14, jwloka, `feature/the-discovery-ticket-card-shows-its`
+- **Delivered:** 2026-10-14
 
 ## Changelog
 
