@@ -15,6 +15,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-board-reads-archived-stories`
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-index-holds-closed-issues`
 - **Started:** 2026-10-13, Jan Wloka, `feature/tickets-and-stories-have-lanes`
+- **Started:** 2026-10-14, Jan Wloka, `feature/the-lanes-read-the-whole-jira-project`
 
 ## Changelog
 
