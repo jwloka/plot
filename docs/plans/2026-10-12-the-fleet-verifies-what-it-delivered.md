@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
@@ -17,6 +17,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/a-tracker-opens-an-issue`
 - **Started:** 2026-10-13, Jan Wloka, `feature/a-refuted-claim-opens-an-issue`
 - **Started:** 2026-10-13, Jan Wloka, `feature/the-fleet-keeps-the-release-checklist`
+- **Delivered:** 2026-10-14
 
 ## Changelog
 
