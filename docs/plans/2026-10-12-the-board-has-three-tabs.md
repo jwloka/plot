@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
@@ -16,6 +16,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/people-names-a-tracker-account`
 - **Started:** 2026-10-14, Jan Wloka, `feature/an-issue-names-its-assignee`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-delivery-tab-filters-by-sprint-and-owner`
+- **Delivered:** 2026-10-14
 
 ## Changelog
 
