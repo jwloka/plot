@@ -12,7 +12,9 @@
 
 ## Changelog
 
-- A lifecycle write that falls back to a micro-PR merges only after the required checks pass on the PR's head, and the merge pins that head.
+- A lifecycle write whose push to the default branch is rejected fetches, re-applies and pushes again, and refuses by name after a bounded number of attempts. It never opens a pull request.
+- Plot merges pull requests with a credential that is not on the default branch's bypass list, so the required checks bind Plot's own merges.
+- `plot-host.sh pr-merge` refuses an unpinned merge on GitHub; every caller names the head SHA it checked.
 
 <!-- Board impact: none expected. The plan format and the board's plan parsing do not change. -->
 
@@ -30,30 +32,46 @@ This is also the likeliest answer to the open question of who merged #1667, #166
 
 ## Design
 
-### Approach
+### Decisions
 
-The cause is not yet confirmed. The first slice reproduces the merge on a scratch PR and names which path passes the required checks: the missing `--match-head-commit`, the bypass mode, the status the ladder writes itself, or a combination. The later slices follow from that answer.
+Decided by the maintainer on 2026-10-15 (issue #1737, comment of that date).
 
-The micro-PR is a booking record with no code. Its review step is the status the ladder writes on its own PR, which makes the gate's author the gate's subject. A required status that the merging process can write for itself is not a gate.
+- **A rejected push retries; there is no micro-PR.** A lifecycle write runs on a disposable branch cut from the fetched default branch. When its push is rejected, the ladder fetches again, re-cuts the branch, re-applies the same write, and pushes again, up to a fixed number of attempts with a short jittered wait. After the last attempt it refuses with the attempt count and writes nothing. The micro-PR fallback in `ladder.ts:155-177` is removed, and with it the `plot/review` status the ladder writes on its own PR: a review status from a process that reviewed nothing is not a review. The race that started this (nine release records pushed at once, 2026-10-15) ends with every write landing, one after another.
+- **Plot's tooling gets no bypass for merges.** Every pull-request merge Plot performs (`plot-ask.mjs merge`, the approve controller's plan-PR merge, any `pr-merge` caller) runs with a credential that is not on the ruleset's bypass list. The maintainer's own break-glass is unchanged: an admin merge with a `review-bypass: <reason>` comment, which `/plot-reconcile` reports.
+- **`pr-merge` is pinned on GitHub.** `plot-host.sh pr-merge` exits 1 on GitHub without `--match-head <sha>`. Every caller passes the head SHA its checks were read on. Bitbucket keeps its named refusal (exit 4) when a pin is asked for, because its host cannot pin a merge.
+
+### The two identities
+
+The first two decisions pull against each other. A lifecycle write is a direct push to the default branch, and the ruleset (a pull-request rule and two required checks) refuses a direct push from anyone off the bypass list. Today those pushes succeed only because the maintainer's token is on that list (`push=bypassed` in every release record of 2026-10-15). Taking the bypass away from Plot's tooling therefore also stops its lifecycle writes.
+
+**Recommended answer: two identities with one job each.**
+
+- **Lifecycle writer:** a narrow GitHub App on the bypass list, set up like `plot-board-builder` (which pushes the built bundles today), with `Contents: write` only. The ladder pushes plan, sprint and index writes with its installation token, minted the way `plot-commit-status.mjs` mints the review App's. It never merges a pull request.
+- **Merger:** a credential that is not on the bypass list, for example a fine-grained token of a non-admin account with `Contents: write` and `Pull requests: write` on this repository. A merge by it passes only when `validate` and `plot/review` are green on the pinned head.
+
+A credential holding both jobs would be on the bypass list and could merge past the gate, so this plan does not offer one.
 
 ### Open Questions
 
-- [ ] Should the micro-PR fallback wait for `validate` and its own `plot/review`, or write no review status and refuse?
-- [ ] Should the admin role's `bypass_mode` move from `always` to `pull_request`, so a bypass needs an explicit request?
-- [ ] Should `pr-merge` always pin with `--match-head-commit`? On Bitbucket the host cannot pin a merge, so the pin applies where the host supports it.
-- [ ] Should the ladder check the result of `commitStatus` (#1719)?
+- [ ] Confirm the two-identity split above, or name the alternative: lifecycle writes through pull requests that the merger merges after CI, which costs one CI run per write.
+- [ ] Which account holds the merger credential, and where does its key or token live (outside the repository, named by a Plot Config key as `Review app` is)?
+- [ ] How many push attempts before a lifecycle write refuses, and how long a wait between them?
 
 ## Slices
 
-### Reproduce
+### Retry
 
-- `bug/a-lifecycle-micro-pr-merged-past-reproduce` — open a scratch PR as the maintainer account, merge it the way the ladder does, and record which rule the merge passes and why
+- `bug/a-lifecycle-micro-pr-merged-past-retry` — the ladder re-fetches and re-pushes a rejected lifecycle write a bounded number of times and refuses by name; the micro-PR fallback and its self-written `plot/review` status are removed <!-- builds: a bounded push retry in the ladder -->
 
-### Fix
+### Pin
 
-- `bug/a-lifecycle-micro-pr-merged-past-ladder` — the micro-PR fallback refuses to merge until the required checks pass on its head, and `pr-merge` always pins the head it saw <!-- waits: bug/a-lifecycle-micro-pr-merged-past-reproduce -->
-- `infra/a-lifecycle-micro-pr-merged-past-bypass` — decide and record the ruleset's `bypass_mode`, and document it in the Plot Config docs <!-- waits: bug/a-lifecycle-micro-pr-merged-past-reproduce -->
+- `bug/a-lifecycle-micro-pr-merged-past-pin` — `plot-host.sh pr-merge` refuses an unpinned merge on GitHub, and every caller passes the head SHA it checked <!-- builds: a mandatory merge pin -->
+
+### Identities
+
+- `infra/a-lifecycle-micro-pr-merged-past-identities` — lifecycle pushes use the writer App's token and pull-request merges use the merger credential, each read from a Plot Config key; the docs give the person's setup steps for both and keep the merger off the bypass list <!-- waits: bug/a-lifecycle-micro-pr-merged-past-retry, bug/a-lifecycle-micro-pr-merged-past-pin -->
 
 ## Notes
 
-- Related: #1719 (the ladder ignores the `commitStatus` result), #1730 (the PR that merged), plan `a-pr-cannot-merge-until-its` (the gate this bug passes).
+- Related: #1719 (the ladder ignores the `commitStatus` result; the retry slice removes that call), #1730 (the PR that merged), plan `a-pr-cannot-merge-until-its` (the gate this bug passes).
+- The maintainer merged some of #1667, #1668, #1687 and #1726 by hand; those are break-glass merges, not this bug.
