@@ -63,7 +63,7 @@ A credential holding both jobs would be on the bypass list and could merge past 
 
 ### Retry
 
-- `bug/a-lifecycle-micro-pr-merged-past-retry` — the ladder re-fetches and re-pushes a rejected lifecycle write a bounded number of times and refuses by name; the micro-PR fallback and its self-written `plot/review` status are removed <!-- builds: a bounded push retry in the ladder -->
+- `bug/a-lifecycle-micro-pr-merged-past-retry` — the ladder re-fetches and re-pushes a rejected lifecycle write a bounded number of times and refuses by name; the micro-PR fallback and its self-written `plot/review` status are removed <!-- builds: a bounded push retry in the ladder --> → #1795
 
 ### Pin
 
