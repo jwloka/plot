@@ -34,9 +34,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
  * With no number, the current branch's PR. The head SHA is read from the host
  * at the start of the run, never from the caller. The reviewer agent runs in a
  * detached worktree at that SHA, and the worktree is removed whatever the
- * outcome. The agent runs read-only on the `command` runner with the fragment
+ * outcome. Before the run, the change is read in that worktree: the merge base
+ * of `origin/<base>` and the head, the changed files, and the full diff. The
+ * diff is written to `<pr>-<sha>.diff` in the reviews directory under the git
+ * common directory, never inside the reviewed tree, and the request names the
+ * files and that file and tells the reviewer to judge only this change. A diff
+ * that cannot be read refuses. The agent runs read-only on the `command` runner with the fragment
  * `reviewerCommand` builds: read and search tools only, no MCP server, no
- * settings from the reviewed tree, and never the `Verify command` fragment.
+ * settings from the reviewed tree, the reviews directory as its one added
+ * read directory, and never the `Verify command` fragment.
  * The agent's final answer is written to a verdict file under the git common
  * directory and read through `reviewVerdict`, never as free text.
  *
@@ -66,6 +72,11 @@ export const REVIEW_CONTEXT = 'plot/review';
 /** How long one review may run before it is ended, in seconds. */
 export const REVIEW_BOUND_SECONDS = 3600;
 
+/** The change a pull request carries, read in the review worktree. */
+export type ReviewChange =
+  | { ok: true; mergeBase: string; files: string[]; diff: string }
+  | { ok: false; why: string };
+
 /** What a review run touches, so a test can supply values instead of a machine. */
 export interface ReviewDeps {
   host: Host;
@@ -82,6 +93,11 @@ export interface ReviewDeps {
   currentBranch: string;
   /** Makes `sha` available locally; true when it is. */
   fetchSha: (sha: string) => Promise<boolean>;
+  /**
+   * Reads the change in `tree`: fetches `origin/<base>`, then the merge base
+   * with `sha`, the changed files, and the full diff.
+   */
+  readChange: (tree: string, base: string, sha: string) => Promise<ReviewChange>;
   /** The charter file's text, or null where absent. */
   readCharterText: () => string | null;
   readText: (file: string) => string | null;
@@ -152,13 +168,15 @@ export const reviewPr = async (deps: ReviewDeps, ref: string): Promise<ReviewOut
   const reviews = path.join(deps.commonDir, 'plot', 'state', 'reviews');
   const verdictFile = path.join(reviews, `${key}.md`);
   const issueFile = path.join(reviews, `${key}.issue`);
+  const diffFile = path.join(reviews, `${key}.diff`);
   const lines: string[] = [];
 
-  const command = reviewerCommand(charter.charter);
+  const command = reviewerCommand(charter.charter, [reviews]);
   if (command.read === 'refused') return refuse(command.why);
   const agentRun = deps.agentRun(command.command);
 
   deps.removeFile(verdictFile);
+  deps.removeFile(diffFile);
   const tree = path.join(deps.repoRoot, '.worktrees', `review-${pr.number}-${sha.slice(0, 7)}`);
   const logFile = path.join(deps.repoRoot, '.plot', 'logs', `review-${pr.number}-${sha.slice(0, 7)}.log`);
   if (!(await deps.fetchSha(sha))) return refuse(`commit ${sha} is not available locally and could not be fetched`);
@@ -167,9 +185,21 @@ export const reviewPr = async (deps: ReviewDeps, ref: string): Promise<ReviewOut
   if (!added.ok) return refuse(`could not create the review worktree ${tree}`);
   let ran;
   try {
+    const change = await deps.readChange(tree, deps.base, sha);
+    if (!change.ok) return refuse(`the change of PR #${pr.number} could not be read: ${change.why}`);
+    deps.writeText(diffFile, change.diff);
+    const request = reviewRequestBlock({
+      pr: pr.number,
+      headSha: sha,
+      base: deps.base,
+      mergeBase: change.mergeBase,
+      files: change.files,
+      diffPath: diffFile,
+      diff: change.diff,
+    });
     ran = await agentRun.run({
       worktree: tree,
-      prompt: `${charter.charter.prompt}\n\n${reviewRequestBlock({ pr: pr.number, headSha: sha, base: deps.base })}`,
+      prompt: `${charter.charter.prompt}\n\n${request}`,
       resumeId: '',
       role: 'reviewer',
       harness: charter.charter.harness,
@@ -251,7 +281,33 @@ export const reviewPr = async (deps: ReviewDeps, ref: string): Promise<ReviewOut
 };
 
 /** `git`, run in `cwd`. */
-const git = (cwd: string, args: readonly string[]) => runProcess('git', ['-C', cwd, ...args]);
+const git = (cwd: string, args: readonly string[], maxBuffer?: number) =>
+  runProcess('git', ['-C', cwd, ...args], maxBuffer === undefined ? {} : { maxBuffer });
+
+/** The largest diff, in bytes, that a review reads; a larger one refuses. */
+export const REVIEW_DIFF_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Reads the change between `origin/<base>` and `sha` in `tree`.
+ *
+ * @param tree - the review worktree, checked out at `sha`.
+ * @param base - the base branch name.
+ * @param sha - the head commit.
+ * @returns the merge base, the changed files and the diff, or the step that failed.
+ */
+const readChange = async (tree: string, base: string, sha: string): Promise<ReviewChange> => {
+  const fetched = await git(tree, ['fetch', '--quiet', 'origin', `+refs/heads/${base}:refs/remotes/origin/${base}`]);
+  if (fetched.code !== 0) return { ok: false, why: `git fetch of origin/${base} failed` };
+  const merged = await git(tree, ['merge-base', `origin/${base}`, sha]);
+  const mergeBase = merged.stdout.trim();
+  if (merged.code !== 0 || mergeBase === '') return { ok: false, why: `no merge base of origin/${base} and ${sha}` };
+  const range = `${mergeBase}..${sha}`;
+  const names = await git(tree, ['diff', '--no-ext-diff', '--name-only', range], REVIEW_DIFF_MAX_BYTES);
+  if (names.code !== 0) return { ok: false, why: `git diff --name-only ${range} failed` };
+  const diff = await git(tree, ['diff', '--no-ext-diff', '--no-color', range], REVIEW_DIFF_MAX_BYTES);
+  if (diff.code !== 0) return { ok: false, why: `git diff ${range} failed or exceeded ${REVIEW_DIFF_MAX_BYTES} bytes` };
+  return { ok: true, mergeBase, files: names.stdout.split('\n').filter((line) => line !== ''), diff: diff.stdout };
+};
 
 /**
  * Builds the dependencies from the machine this process runs on.
@@ -285,6 +341,7 @@ const machineDeps = async (cwd: string, scriptDir: string): Promise<ReviewDeps |
     currentBranch: branch.stdout.trim(),
     fetchSha: async (sha) => (await git(repoRoot, ['cat-file', '-e', `${sha}^{commit}`])).code === 0
       || (await git(repoRoot, ['fetch', '--quiet', 'origin', sha])).code === 0,
+    readChange,
     readCharterText: () => {
       const file = path.join(repoRoot, charterPath('reviewer'));
       return existsSync(file) ? readFileSync(file, 'utf8') : null;

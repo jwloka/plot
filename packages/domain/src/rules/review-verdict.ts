@@ -40,28 +40,61 @@ export const reviewVerdict = (text: string): ReviewVerdict => {
   return { read: 'counted', counts: { high, medium, low } };
 };
 
+/** The largest diff, in characters, that a review request carries inline. */
+export const REVIEW_INLINE_DIFF_LIMIT = 200_000;
+
+/** The heading under which a reviewer may name content outside the change. */
+export const OUTSIDE_THE_CHANGE_HEADING = 'Outside this change';
+
 /** What a review request names about one pull request. */
 export interface ReviewRequest {
   pr: number;
   headSha: string;
   base: string;
+  /** The merge base of the base branch and the head commit. */
+  mergeBase: string;
+  /** The paths the change touches, from `git diff --name-only <mergeBase>..<headSha>`. */
+  files: readonly string[];
+  /** The absolute path of a file holding the full diff, `git diff <mergeBase>..<headSha>`. */
+  diffPath: string;
+  /** The full diff text. */
+  diff: string;
 }
 
 /**
  * The fixed review-request block appended to the reviewer charter's prompt.
  *
- * @param request - the pull request, its head and its base branch.
- * @returns the block: the PR facts, the severity rubric, the read-only rule, and
- *   the instruction to end the final answer with the one `Findings:` line.
+ * The block names the change exactly: the merge base, the changed files and
+ * the path of the full diff. The diff itself is inline when it holds at most
+ * {@link REVIEW_INLINE_DIFF_LIMIT} characters, and is left out otherwise.
+ *
+ * @param request - the pull request, its head, its base branch and its change.
+ * @returns the block: the PR facts, the change, the scope rule, the severity
+ *   rubric, the read-only rule, and the instruction to end the final answer
+ *   with the one `Findings:` line.
  */
-export const reviewRequestBlock = (request: ReviewRequest): string =>
-  [
+export const reviewRequestBlock = (request: ReviewRequest): string => {
+  const range = `${request.mergeBase}..${request.headSha}`;
+  const inline = request.diff.length <= REVIEW_INLINE_DIFF_LIMIT;
+  return [
     'Review request',
     `Pull request: #${request.pr}`,
     `Head commit: ${request.headSha}`,
     `Base branch: ${request.base}`,
+    `Merge base: ${request.mergeBase}`,
     '',
-    'Review the change between the base branch and the head commit. The working tree is checked out at the head commit.',
+    `The change is \`git diff ${range}\`. The working tree is checked out at the head commit.`,
+    '',
+    `Changed files (${request.files.length}):`,
+    ...(request.files.length === 0 ? ['- (none)'] : request.files.map((file) => `- ${file}`)),
+    '',
+    `Full diff: ${request.diffPath}`,
+    ...(inline
+      ? ['', '```diff', request.diff.replace(/\n$/, ''), '```']
+      : [`The diff holds ${request.diff.length} characters, more than ${REVIEW_INLINE_DIFF_LIMIT}, so it is not inline. Read it from the file above.`]),
+    '',
+    'Scope: judge only this change. Content the change does not add, remove or modify is not a finding of this pull request, even where it is wrong.',
+    `You may name such content only under a separate heading "${OUTSIDE_THE_CHANGE_HEADING}". It never counts in the Findings: line.`,
     '',
     'Severity:',
     '- HIGH: a security leak, a wrong result users hit, or a break of main or of merges.',
@@ -73,6 +106,7 @@ export const reviewRequestBlock = (request: ReviewRequest): string =>
     'Give your verdict as your final answer. List each finding with its severity, then end with exactly one line:',
     'Findings: HIGH <n>, MEDIUM <n>, LOW <n>',
   ].join('\n');
+};
 
 /** The only tools the reviewer's harness offers it: read and search. */
 export const REVIEWER_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob'];
@@ -84,6 +118,9 @@ export const REVIEWER_DENY: readonly string[] = [
 
 /** A model or effort word the reviewer command accepts; it is single-quoted into the command. */
 const COMMAND_WORD = /^[A-Za-z0-9._:[\]-]+$/;
+
+/** `value` single-quoted for a POSIX shell, with each `'` written as `'\''`. */
+const singleQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
 
 /** What `reviewerCommand` answers: the shell fragment, or the reason none is built. */
 export type ReviewerCommand = { read: 'command'; command: string } | { read: 'refused'; why: string };
@@ -97,13 +134,18 @@ export type ReviewerCommand = { read: 'command'; command: string } | { read: 're
  * user`, so no hook or permission rule from the reviewed tree applies),
  * denies every permission the settings do not grant (`--permission-mode
  * dontAsk`), and loads no MCP server (`--strict-mcp-config`). It never names
- * `bypassPermissions`.
+ * `bypassPermissions`. Each of `readDirs` is passed as `--add-dir`, single-quoted,
+ * so the reviewer may read files there outside its working tree.
  *
  * @param charter - the reviewer charter's harness, model and effort.
+ * @param readDirs - absolute directories outside the working tree the reviewer reads.
  * @returns the fragment, or a refusal for a harness other than `claude` or a
  *   model or effort word outside `[A-Za-z0-9._:[\]-]`.
  */
-export const reviewerCommand = (charter: { harness: string; model: string; effort: string }): ReviewerCommand => {
+export const reviewerCommand = (
+  charter: { harness: string; model: string; effort: string },
+  readDirs: readonly string[],
+): ReviewerCommand => {
   if (charter.harness !== '' && charter.harness !== 'claude') {
     return { read: 'refused', why: `the reviewer runs read-only on claude only; the charter names harness '${charter.harness}'` };
   }
@@ -117,6 +159,7 @@ export const reviewerCommand = (charter: { harness: string; model: string; effor
     '-p',
     ...(charter.model === '' ? [] : ['--model', `'${charter.model}'`]),
     ...(charter.effort === '' ? [] : ['--effort', `'${charter.effort}'`]),
+    ...readDirs.flatMap((dir) => ['--add-dir', singleQuote(dir)]),
     '--tools',
     REVIEWER_TOOLS.join(','),
     '--disallowedTools',

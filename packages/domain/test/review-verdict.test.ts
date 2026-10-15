@@ -3,6 +3,8 @@ import {
   REVIEWER_DENY,
   REVIEWER_TOOLS,
   reviewerCommand,
+  OUTSIDE_THE_CHANGE_HEADING,
+  REVIEW_INLINE_DIFF_LIMIT,
   reviewRequestBlock,
   reviewVerdict,
 } from '../src/rules/review-verdict.js';
@@ -55,16 +57,55 @@ describe('reviewVerdict', () => {
 });
 
 describe('reviewRequestBlock', () => {
+  const request = {
+    pr: 7, headSha: 'abc123', base: 'main', mergeBase: 'def456',
+    files: ['docs/a.md', 'src/b.ts'], diffPath: '/repo/.git/plot/state/reviews/7-head.diff', diff: '+added line\n',
+  };
+
   it('names the PR, the head, the base, the rubric, the read-only rule and the final-answer line', () => {
-    const block = reviewRequestBlock({ pr: 7, headSha: 'abc123', base: 'main' });
+    const block = reviewRequestBlock(request);
     for (const part of ['#7', 'abc123', 'main', 'HIGH:', 'MEDIUM:', 'LOW:', 'Read-only', 'final answer', 'Findings: HIGH <n>']) {
       expect(block).toContain(part);
     }
   });
+
+  it('names the merge base, the changed files and the diff file', () => {
+    const block = reviewRequestBlock(request);
+    expect(block).toContain('Merge base: def456');
+    expect(block).toContain('`git diff def456..abc123`');
+    expect(block).toContain('Changed files (2):\n- docs/a.md\n- src/b.ts');
+    expect(block).toContain('Full diff: /repo/.git/plot/state/reviews/7-head.diff');
+  });
+
+  it('tells the reviewer to judge only the change and to keep the rest out of the count', () => {
+    const block = reviewRequestBlock(request);
+    expect(block).toContain('Scope: judge only this change.');
+    expect(block).toContain(`"${OUTSIDE_THE_CHANGE_HEADING}"`);
+    expect(block).toContain('It never counts in the Findings: line.');
+  });
+
+  it('carries the diff inline at the limit', () => {
+    const diff = `+${'x'.repeat(REVIEW_INLINE_DIFF_LIMIT - 1)}`;
+    const block = reviewRequestBlock({ ...request, diff });
+    expect(block).toContain(`\`\`\`diff\n${diff}\n\`\`\``);
+    expect(block).not.toContain('not inline');
+  });
+
+  it('leaves the diff out over the limit and names the file instead', () => {
+    const diff = `+${'x'.repeat(REVIEW_INLINE_DIFF_LIMIT)}`;
+    const block = reviewRequestBlock({ ...request, diff });
+    expect(block).not.toContain('```diff');
+    expect(block).toContain(`The diff holds ${REVIEW_INLINE_DIFF_LIMIT + 1} characters, more than ${REVIEW_INLINE_DIFF_LIMIT}, so it is not inline.`);
+    expect(block).toContain('Full diff: /repo/.git/plot/state/reviews/7-head.diff');
+  });
+
+  it('says so when the change touches no file', () => {
+    expect(reviewRequestBlock({ ...request, files: [], diff: '' })).toContain('Changed files (0):\n- (none)');
+  });
 });
 
 const command = (charter: { harness: string; model: string; effort: string }): string => {
-  const built = reviewerCommand(charter);
+  const built = reviewerCommand(charter, []);
   if (built.read !== 'command') throw new Error(`expected a command, got ${built.why}`);
   return built.command;
 };
@@ -75,6 +116,15 @@ describe('reviewerCommand', () => {
       'claude -p --tools Read,Grep,Glob --disallowedTools Write,Edit,NotebookEdit,Bash,Agent,Task,WebFetch,WebSearch'
         + ' --setting-sources user --permission-mode dontAsk --strict-mcp-config',
     );
+  });
+
+  it('adds each read directory before the tool list, single-quoted with a quote escaped', () => {
+    const built = reviewerCommand({ harness: '', model: '', effort: '' }, ['/repo/.git/plot/state/reviews', "/it's here"]);
+    if (built.read !== 'command') throw new Error(built.why);
+    expect(built.command).toContain(
+      "claude -p --add-dir '/repo/.git/plot/state/reviews' --add-dir '/it'\\''s here' --tools Read,Grep,Glob ",
+    );
+    expect(built.command.endsWith(' --strict-mcp-config')).toBe(true);
   });
 
   it('names the charter model and effort, single-quoted', () => {
@@ -91,18 +141,18 @@ describe('reviewerCommand', () => {
   });
 
   it('refuses a harness other than claude', () => {
-    expect(reviewerCommand({ harness: 'codex', model: '', effort: '' })).toEqual({
+    expect(reviewerCommand({ harness: 'codex', model: '', effort: '' }, [])).toEqual({
       read: 'refused',
       why: "the reviewer runs read-only on claude only; the charter names harness 'codex'",
     });
   });
 
   it('refuses a model or effort that is not one word', () => {
-    expect(reviewerCommand({ harness: '', model: "opus' --permission-mode bypassPermissions '", effort: '' })).toMatchObject({
+    expect(reviewerCommand({ harness: '', model: "opus' --permission-mode bypassPermissions '", effort: '' }, [])).toMatchObject({
       read: 'refused',
       why: expect.stringContaining("model"),
     });
-    expect(reviewerCommand({ harness: '', model: 'opus', effort: 'high; rm -rf /' })).toMatchObject({
+    expect(reviewerCommand({ harness: '', model: 'opus', effort: 'high; rm -rf /' }, [])).toMatchObject({
       read: 'refused',
       why: expect.stringContaining('effort'),
     });
