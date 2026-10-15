@@ -11,6 +11,7 @@
 - **Impl:** own branches
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1749 merged
 - **Started:** 2026-10-15, Jan Wloka, `feature/review-diff-limit-in-bytes`
+- **Started:** 2026-10-15, Jan Wloka, `feature/review-judges-the-pr-base`
 
 ## Changelog
 
