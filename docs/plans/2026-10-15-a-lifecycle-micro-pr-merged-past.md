@@ -12,6 +12,7 @@
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1738 merged
 - **Started:** 2026-10-15, Jan Wloka, `bug/a-lifecycle-micro-pr-merged-past-retry`
 - **Started:** 2026-10-15, Jan Wloka, `bug/a-lifecycle-micro-pr-merged-past-pin`
+- **Started:** 2026-10-16, Jan Wloka, `infra/a-lifecycle-micro-pr-merged-past-identities`
 
 ## Changelog
 
