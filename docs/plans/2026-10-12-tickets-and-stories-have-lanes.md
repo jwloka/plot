@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Delivered
+- **State:** Released
 - **Type:** feature
 - **Story:** plot-works-in-five-phases
 - **Review:** pr
@@ -17,6 +17,7 @@
 - **Started:** 2026-10-13, Jan Wloka, `feature/tickets-and-stories-have-lanes`
 - **Started:** 2026-10-14, Jan Wloka, `feature/the-lanes-read-the-whole-jira-project`
 - **Delivered:** 2026-10-14
+- **Released:** 2026-10-15, v2.27.0
 
 ## Changelog
 
