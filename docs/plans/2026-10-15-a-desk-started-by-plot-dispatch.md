@@ -12,6 +12,7 @@
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1776 merged
+- **Started:** 2026-10-15, Jan Wloka, `bug/a-free-desk-block-reproduces`
 
 ## Changelog
 
