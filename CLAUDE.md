@@ -105,6 +105,7 @@ Plot dog-foods its own config mechanism. Helpers read these via `skills/plot/scr
 - **Auto-design:** false
 - **Review app:** 5317669 /Users/jwloka/.config/plot/plot-review.5317669.private-key.pem
 - **Review required since:** 2026-10-15T02:17:59Z
+- **Plan PRs:** required
 
 <!-- `Review app` names the GitHub App `plot-host.sh commit-status` and
      `plot-commit-status.mjs` mint an installation token from to write the
