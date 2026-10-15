@@ -50,7 +50,7 @@ Layering: the limit is a domain rule; `readChange` and `mkdirSync` stay in the b
 ### Wave 1
 
 - `feature/review-diff-limit-in-bytes` — limit the inline diff in bytes below the argument cap <!-- builds: REVIEW_INLINE_DIFF_LIMIT in bytes, with a reserve for the prompt -->
-- `feature/review-judges-the-pr-base` — add the base ref to `Pr` and diff against it <!-- builds: Pr.base, filled by the host connectors -->
+- `feature/review-judges-the-pr-base` — add the base ref to `Pr` and diff against it → #1804 <!-- builds: Pr.base, filled by the host connectors -->
 
 ### Wave 2
 
