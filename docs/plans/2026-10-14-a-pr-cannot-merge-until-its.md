@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Delivered
+- **State:** Released
 - **Type:** feature
 - **Issue:** #1702
 - **Review:** pr
@@ -15,6 +15,7 @@
 - **Started:** 2026-10-14, Jan Wloka, `feature/a-pr-cannot-merge-until-its-bitbucket`
 - **Started:** 2026-10-14, Jan Wloka, `docs/a-pr-cannot-merge-until-its-branch-rule`
 - **Delivered:** 2026-10-15
+- **Released:** 2026-10-15, v2.27.0
 
 ## Changelog
 
