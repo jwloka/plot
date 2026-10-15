@@ -56,7 +56,7 @@ The rule stays in the domain (`continueTarget`); a fix to the reading goes in th
 
 ### Reproduce
 
-- `bug/a-free-desk-block-reproduces` — a failing test: a free desk handed a slice that blocks refuses a continue with `no-manifest`. It names which of the open questions above is the cause. <!-- spike -->
+- `bug/a-free-desk-block-reproduces` — a failing test: a free desk handed a slice that blocks refuses a continue with `no-manifest`. It names which of the open questions above is the cause. → #1779 <!-- spike -->
 
 ### Repair
 
