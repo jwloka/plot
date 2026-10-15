@@ -78,7 +78,7 @@ The change has three parts, in the order the layering rule gives.
 
 ### The data
 
-- `feature/a-plan-card-names-its-owners` — the plan card carries the approver and the author; the story row carries `author` into the owned row. `Approved:` parsing lives in the domain. <!-- waits: feature/ownership-reads-story-authors --> <!-- builds: approverOf, the approver named by an approval record -->
+- `feature/a-plan-card-names-its-owners` → #1775 — the plan card carries the approver and the author; the story row carries `author` into the owned row. `Approved:` parsing lives in the domain. <!-- waits: feature/ownership-reads-story-authors --> <!-- builds: approverOf, the approver named by an approval record -->
 
 ### The control
 
