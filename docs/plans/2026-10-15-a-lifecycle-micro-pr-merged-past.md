@@ -68,7 +68,7 @@ A credential holding both jobs would be on the bypass list and could merge past 
 
 ### Pin
 
-- `bug/a-lifecycle-micro-pr-merged-past-pin` — `plot-host.sh pr-merge` refuses an unpinned merge on GitHub, and every caller passes the head SHA it checked <!-- builds: a mandatory merge pin -->
+- `bug/a-lifecycle-micro-pr-merged-past-pin` — `plot-host.sh pr-merge` refuses an unpinned merge on GitHub, and every caller passes the head SHA it checked <!-- builds: a mandatory merge pin --> → #1809
 
 ### Identities
 
