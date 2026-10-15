@@ -55,7 +55,7 @@ Layering: the limit is a domain rule; `readChange` and `mkdirSync` stay in the b
 
 ### Wave 2
 
-- `feature/review-refuses-a-tracked-dir` — a tracked `.plot-review` file ends the run with exit 3, and `readChange` gets its tests <!-- builds: a named refusal for an unusable review directory; readChange tests --> <!-- waits: feature/review-judges-the-pr-base -->
+- `feature/review-refuses-a-tracked-dir` — a tracked `.plot-review` file ends the run with exit 3, and `readChange` gets its tests → #1807 <!-- builds: a named refusal for an unusable review directory; readChange tests --> <!-- waits: feature/review-judges-the-pr-base -->
 
 ## Notes
 
