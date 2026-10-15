@@ -1,0 +1,1 @@
+../2026-10-15-discovery-and-planning-cards-show-the.md
