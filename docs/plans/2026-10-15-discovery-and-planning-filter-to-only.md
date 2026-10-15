@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Issue:** #1751
 - **Review:** pr
@@ -13,6 +13,7 @@
 - **Started:** 2026-10-15, Jan Wloka, `feature/ownership-reads-story-authors`
 - **Started:** 2026-10-15, Jan Wloka, `feature/a-plan-card-names-its-owners`
 - **Started:** 2026-10-15, Jan Wloka, `feature/discovery-filters-to-only-my-work`
+- **Delivered:** 2026-10-15
 
 ## Changelog
 
