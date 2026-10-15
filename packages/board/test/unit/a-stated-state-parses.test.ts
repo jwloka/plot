@@ -88,3 +88,48 @@ describe('neither parser declares its own list', () => {
     expect(new Set(STORY_LIFECYCLE)).toEqual(new Set(StoryStatusSchema.options));
   });
 });
+
+describe('a story title read from frontmatter', () => {
+  const read = (titleLine: string) =>
+    parseStoryContent(`---\n${titleLine}\n---\n\n# H1\n`, 'slug', 'docs/stories/slug/story.md', '')?.title;
+
+  it('drops one pair of double quotes', () => {
+    expect(read('title: "EWZKUS-1 — Einladungen löschen"')).toBe('EWZKUS-1 — Einladungen löschen');
+  });
+
+  it('drops one pair of single quotes', () => {
+    expect(read("title: 'A story'")).toBe('A story');
+  });
+
+  it('keeps an unquoted title whole', () => {
+    expect(read('title: A story')).toBe('A story');
+  });
+
+  it('keeps a quote inside the value and an unmatched edge quote', () => {
+    expect(read('title: Say "hi" now')).toBe('Say "hi" now');
+    expect(read('title: "half open')).toBe('"half open');
+  });
+});
+
+describe('a story date and objective read from a story file', () => {
+  const read = (frontmatter: string, body = '') =>
+    parseStoryContent(`---\n${frontmatter}\n---\n\n# H1\n${body}`, 'slug', 'docs/stories/slug/story.md', '');
+
+  it('drops quotes around created and updated', () => {
+    const story = read('created: "2026-10-15"\nupdated: \'2026-10-14\'');
+    expect(story?.created).toBe('2026-10-15');
+    expect(story?.updated).toBe('2026-10-14');
+  });
+
+  it('keeps an unquoted date whole', () => {
+    expect(read('created: 2026-10-15')?.created).toBe('2026-10-15');
+  });
+
+  it('drops one pair of quotes around the objective', () => {
+    expect(read('title: T', '\n## Objective\n\n"Ship the card."\n')?.objective).toBe('Ship the card.');
+  });
+
+  it('keeps an unquoted objective whole', () => {
+    expect(read('title: T', '\n## Objective\n\nShip the card.\n')?.objective).toBe('Ship the card.');
+  });
+});

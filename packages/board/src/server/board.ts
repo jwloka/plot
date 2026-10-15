@@ -1634,6 +1634,18 @@ function parseStoryFile(absPath: string, slug: string, relPath: string, storyDir
 }
 
 /**
+ * Strips one matching pair of surrounding quotes from a string. A quote inside
+ * the value, and an unmatched edge quote, stay.
+ */
+export const unquoteScalar = (value: string): string => {
+  if (value.length >= 2) {
+    const q = value[0];
+    if ((q === '"' || q === "'") && value[value.length - 1] === q) return value.slice(1, -1);
+  }
+  return value;
+};
+
+/**
  * The same parse, from content a caller already holds.
  *
  * THE SPLIT SPRINTS ALREADY HAVE, and stories needed it for the same reason: a
@@ -1672,7 +1684,7 @@ export function parseStoryContent(
   if (fm) {
     const frontmatter = fm[1];
     const titleMatch = frontmatter.match(/^title:\s*(.+)$/m);
-    if (titleMatch) title = titleMatch[1].trim();
+    if (titleMatch) title = unquoteScalar(titleMatch[1].trim());
     const statusMatch = frontmatter.match(/^status:\s*(.+)$/m);
     // The DECLARED status, refused where the domain does not admit it. A story
     // with no `status:` line keeps `''` — an absence the drift check already
@@ -1681,9 +1693,9 @@ export function parseStoryContent(
     const authorMatch = frontmatter.match(/^author:\s*(.+)$/m);
     if (authorMatch) author = authorMatch[1].trim();
     const createdMatch = frontmatter.match(/^created:\s*(.+)$/m);
-    if (createdMatch) created = createdMatch[1].trim();
+    if (createdMatch) created = unquoteScalar(createdMatch[1].trim());
     const updatedMatch = frontmatter.match(/^updated:\s*(.+)$/m);
-    if (updatedMatch) updated = updatedMatch[1].trim();
+    if (updatedMatch) updated = unquoteScalar(updatedMatch[1].trim());
   }
 
   // Fall back to H1 heading for title
@@ -1694,7 +1706,7 @@ export function parseStoryContent(
 
   // Extract content sections
   const objectiveFull = extractSection(content, 'Objective');
-  const objective = truncateText(objectiveFull, 200);
+  const objective = truncateText(unquoteScalar(objectiveFull), 200);
   const design = extractSection(content, 'Design');
   const hasOpenPoints = /^## Open Points\s*$/m.test(content);
   const hasSessionLog = /^## Session Log\s*$/m.test(content);
