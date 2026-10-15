@@ -56,7 +56,7 @@ The shape function belongs in `sections.ts` beside `ungroupedRows`, so both call
 
 ### Group shape
 
-- `bug/waiting-on-you-lists-a-draft` — Add the `{ head, slices, loose }` group shape in `sections.ts` with unit tests for a mixed group (plan-kind row plus `wave` rows), make `planHeads` in `AgentList.tsx` and `sectionTally` read it, and add one browser test showing a Draft plan's slices nested under its plan row in Waiting on you. <!-- builds: groupShape, the head/slices/loose split of a plan group -->
+- `bug/waiting-on-you-lists-a-draft` — Add the `{ head, slices, loose }` group shape in `sections.ts` with unit tests for a mixed group (plan-kind row plus `wave` rows), make `planHeads` in `AgentList.tsx` and `sectionTally` read it, and add one browser test showing a Draft plan's slices nested under its plan row in Waiting on you. → #1746 <!-- builds: groupShape, the head/slices/loose split of a plan group -->
 
 ## Notes
 
