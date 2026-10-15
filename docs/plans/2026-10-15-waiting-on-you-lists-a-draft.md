@@ -4,13 +4,14 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** bug
 - **Issue:** #1740
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1741 merged
 - **Started:** 2026-10-15, Jan Wloka, `bug/waiting-on-you-lists-a-draft`
+- **Delivered:** 2026-10-15
 
 ## Changelog
 
