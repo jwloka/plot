@@ -136,6 +136,8 @@ export interface Context {
   trees: Trees;
   /** Resolves the tracker that opens issues from the declared `Tracker` key and the git host's backend. */
   issueTracker: (declared: string, backend: string) => Tracker;
+  /** Sleeps between push attempts; the ladder's jittered 2 to 10 s wait where absent. */
+  retryWait?: () => Promise<void>;
 }
 
 /** What the command line asked for. */
@@ -707,8 +709,6 @@ export const record = async (ctx: Context, args: Args, write: Printer, warn: Pri
     const target = path.join(tmpwt, facts.plan);
     const present = await ctx.planStore.readText(target);
     if (!present.ok || present.value === null) throw new Refused(`${facts.plan} is not present on origin/${main}`);
-    const meta = await ctx.planStore.readPlan(target);
-    const listed = meta.ok && listsOnChecklist(meta.value.type, planStateOf(meta.value.phase));
 
     const declared = await ctx.scripts.config('Tracker', '');
     const backend = await ctx.host.backend();
@@ -737,15 +737,28 @@ export const record = async (ctx: Context, args: Args, write: Printer, warn: Pri
       },
       verdicts,
     );
-    const recorded = withRecord(present.value, 'Verified', value, 'replace');
-    const landed = withSection(recorded.text, 'Verification', verificationBody(verdicts, notes));
-    const written = await ctx.planStore.writeText(target, landed);
-    if (!written.ok) throw new Refused(`could not write ${facts.plan}.\n  Re-run this — it is idempotent.`);
 
-    const checklistPath = listed
-      ? await writeChecklist(ctx, tmpwt, checklistEntryOf(args.slug, present.value, verdicts, notes))
-      : null;
-    await ctx.trees.stage(tmpwt, checklistPath === null ? [facts.plan] : [facts.plan, checklistPath]);
+    // Writes the record, the section and the checklist entry into `wt` from
+    // the plan text `wt` holds now, and stages them. Runs once per push
+    // attempt: a retry after a rejected push reads the re-fetched default
+    // branch's text. `openRefutedIssues` above changes issue state, so it
+    // runs once and every attempt reuses its `notes`.
+    const book = async (wt: string): Promise<void> => {
+      const plan = path.join(wt, facts.plan);
+      const fresh = await ctx.planStore.readText(plan);
+      if (!fresh.ok || fresh.value === null) throw new Refused(`${facts.plan} is not present on origin/${main}`);
+      const meta = await ctx.planStore.readPlan(plan);
+      const listed = meta.ok && listsOnChecklist(meta.value.type, planStateOf(meta.value.phase));
+      const recorded = withRecord(fresh.value, 'Verified', value, 'replace');
+      const landed = withSection(recorded.text, 'Verification', verificationBody(verdicts, notes));
+      const written = await ctx.planStore.writeText(plan, landed);
+      if (!written.ok) throw new Refused(`could not write ${facts.plan}.\n  Re-run this — it is idempotent.`);
+      const checklistPath = listed
+        ? await writeChecklist(ctx, wt, checklistEntryOf(args.slug, fresh.value, verdicts, notes))
+        : null;
+      await ctx.trees.stage(wt, checklistPath === null ? [facts.plan] : [facts.plan, checklistPath]);
+    };
+    await book(tmpwt);
 
     const pushed = await commitAndPush(
       ctx,
@@ -754,10 +767,9 @@ export const record = async (ctx: Context, args: Args, write: Printer, warn: Pri
       main,
       who,
       `plot: verify ${args.slug}`,
-      `plot: verify ${args.slug}`,
-      `Records the verification of \`${args.slug}\`.`,
       'verification',
       `nothing to commit — the verification is already recorded on ${main}`,
+      book,
       write,
     );
     if ('rejected' in pushed) {
@@ -774,6 +786,21 @@ export const record = async (ctx: Context, args: Args, write: Printer, warn: Pri
     await cleanup();
     throw err;
   }
+};
+
+/**
+ * Reads the `PLOT_PUSH_RETRY_WAIT_MS` override of the wait between push attempts.
+ * Only this entry reads it; the ladder itself reads no environment.
+ *
+ * @param raw - the variable's value.
+ * @returns a wait of that many milliseconds, or `undefined` (the ladder's jittered
+ *   2 to 10 s wait) when the value is unset, empty, negative or not a number.
+ */
+const retryWaitFromEnv = (raw: string | undefined): (() => Promise<void>) | undefined => {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const ms = Number(raw);
+  if (!Number.isFinite(ms) || ms < 0) return undefined;
+  return () => new Promise<void>((resolve) => setTimeout(resolve, ms));
 };
 
 /**
@@ -850,6 +877,7 @@ export const run = async (
     scripts: scriptsShell(context),
     trees: treesGit(context),
     issueTracker: (declared, backend) => trackerForIssues(declared, backend, context),
+    retryWait: retryWaitFromEnv(process.env.PLOT_PUSH_RETRY_WAIT_MS),
   };
   try {
     if (parsed.command !== 'prepare' && handsOver(ctx, parsed.slug)) {
