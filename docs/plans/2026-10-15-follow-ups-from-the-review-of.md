@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Issue:** #1724
 - **Review:** pr
@@ -13,6 +13,7 @@
 - **Started:** 2026-10-15, Jan Wloka, `feature/review-diff-limit-in-bytes`
 - **Started:** 2026-10-15, Jan Wloka, `feature/review-judges-the-pr-base`
 - **Started:** 2026-10-15, Jan Wloka, `feature/review-refuses-a-tracked-dir`
+- **Delivered:** 2026-10-16
 
 ## Changelog
 
