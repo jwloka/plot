@@ -1,0 +1,1 @@
+../2026-10-15-a-desk-that-ended-cleanly-at.md
