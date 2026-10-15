@@ -60,7 +60,7 @@ The rule stays in the domain (`continueTarget`); a fix to the reading goes in th
 
 ### Repair
 
-- `bug/a-free-agent-desk-is-continuable` — the repair the measurement selects, with the test from the first slice passing. <!-- waits: bug/a-free-desk-block-reproduces -->
+- `bug/a-free-agent-desk-is-continuable` — the repair the measurement selects, with the test from the first slice passing. → #1787 <!-- waits: bug/a-free-desk-block-reproduces -->
 
 ## Notes
 
