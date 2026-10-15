@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** feature
 - **Issue:** #1750
 - **Review:** pr
@@ -12,6 +12,7 @@
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1753 merged
 - **Started:** 2026-10-15, Jan Wloka, `feature/ticket-cards-show-type-and-owner`
 - **Started:** 2026-10-15, Jan Wloka, `feature/plan-and-story-cards-show-type-and-owner`
+- **Delivered:** 2026-10-15
 
 ## Changelog
 
