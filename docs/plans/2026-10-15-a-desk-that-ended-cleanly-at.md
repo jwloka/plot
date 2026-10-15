@@ -4,7 +4,7 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** bug
 - **Issue:** #1743
 - **Review:** pr
@@ -12,6 +12,7 @@
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1744 merged
 - **Started:** 2026-10-15, Jan Wloka, `bug/a-clean-wait-end-writes-no-marker`
 - **Started:** 2026-10-15, Jan Wloka, `bug/an-ended-desk-is-not-waiting-on-you`
+- **Delivered:** 2026-10-15
 
 ## Changelog
 
