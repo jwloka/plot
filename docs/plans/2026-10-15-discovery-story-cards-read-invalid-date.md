@@ -4,13 +4,14 @@
 
 ## Status
 
-- **State:** Approved
+- **State:** Delivered
 - **Type:** bug
 - **Issue:** #1752
 - **Review:** pr
 - **Impl:** own branches
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1754 merged
 - **Started:** 2026-10-15, Jan Wloka, `bug/discovery-tickets-heading-reason`
+- **Delivered:** 2026-10-15
 
 ## Changelog
 
