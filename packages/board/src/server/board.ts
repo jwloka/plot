@@ -47,6 +47,9 @@ import {
   type SliceSpendRecord,
   type Trees,
   planSpend,
+  planCardView,
+  storyCardView,
+  type PersonDirectory,
   DEFAULT_PHASE_MAP,
   parsePhaseMap,
   phaseColumns,
@@ -55,6 +58,7 @@ import {
   approverOf,
 } from '@plot-pm/domain';
 import type { DefaultBranchStore } from '@plot-pm/domain/ports/default-branch';
+import { people } from './server-info.js';
 import {
   buildShell,
   hostShell,
@@ -1769,8 +1773,9 @@ export async function collectStories(
   allPlans: PlanMeta[],
   ref?: string,
   refs?: Refs,
+  directory: PersonDirectory = {},
 ): Promise<StoryCard[]> {
-  return collectStoryCards(repoRoot, storyDir, allPlans, false, ref, refs);
+  return collectStoryCards(repoRoot, storyDir, allPlans, false, ref, refs, directory);
 }
 
 /**
@@ -1785,8 +1790,9 @@ export async function collectArchivedStories(
   allPlans: PlanMeta[],
   ref?: string,
   refs?: Refs,
+  directory: PersonDirectory = {},
 ): Promise<StoryCard[]> {
-  return collectStoryCards(repoRoot, storyDir, allPlans, true, ref, refs);
+  return collectStoryCards(repoRoot, storyDir, allPlans, true, ref, refs, directory);
 }
 
 const collectStoryCards = async (
@@ -1796,6 +1802,7 @@ const collectStoryCards = async (
   archived: boolean,
   ref?: string,
   refs?: Refs,
+  directory: PersonDirectory = {},
 ): Promise<StoryCard[]> => {
   const root = archived
     ? path.join(repoRoot, storyDir, 'archived')
@@ -1909,6 +1916,7 @@ const collectStoryCards = async (
       plans,
       sprints,
       statusDrift: drift,
+      owner: storyCardView(input.author ?? '', directory).owner,
     };
 
     // Parse through Zod to apply defaults and validate
@@ -1986,6 +1994,9 @@ export async function buildBoard(opts: BuildBoardOptions): Promise<Board> {
 
   const repoRoot = resolvedRepoRoot(opts);
   const defaultBranch = await defaultBranchOf(opts, refs);
+  // The declared `People` spellings, read once per process; plan and story
+  // cards resolve their owner through it.
+  const directory = await people(opts);
   // THE PLAN ESTATE COMES FROM THE REF, and the working tree may only add to
   // it. See `collectPlanSources` for the one-directional rule and why the
   // direction is the whole fix.
@@ -2254,10 +2265,16 @@ export async function buildBoard(opts: BuildBoardOptions): Promise<Board> {
     const phase = phaseOfPlan(phaseMap, { state: meta.phase, deliverable: status === 'deliverable', tracer: meta.tracer });
     if (!phase) continue;
     const slug = planSlug(relPath);
+    const cardView = planCardView(
+      { type: meta.type, assignee: meta.assignee, approvedRaw: meta.approved_raw },
+      directory,
+    );
     const card: Card = {
       slug,
       title: meta.title || slug,
       type: meta.type || 'unknown',
+      typeLabel: cardView.type,
+      owner: cardView.owner,
       phase,
       controls: cardControls({
         state: meta.phase,
@@ -2419,10 +2436,10 @@ export async function buildBoard(opts: BuildBoardOptions): Promise<Board> {
   }));
 
   const stories = await collectStories(
-    repoRoot, storyDir, metas, `origin/${defaultBranch}`, refs,
+    repoRoot, storyDir, metas, `origin/${defaultBranch}`, refs, directory,
   );
   const archivedStories = await collectArchivedStories(
-    repoRoot, storyDir, metas, `origin/${defaultBranch}`, refs,
+    repoRoot, storyDir, metas, `origin/${defaultBranch}`, refs, directory,
   );
   // THE LAST TWO READS, ASKED TOGETHER, for the same reason the three config
   // reads at the top are: the sprint estate and the release directory need
