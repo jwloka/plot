@@ -7,7 +7,7 @@
 - **State:** Draft
 - **Type:** bug
 - **Issue:** #1743
-- **Review:** in-session
+- **Review:** pr
 - **Impl:** own branches
 
 ## Changelog
