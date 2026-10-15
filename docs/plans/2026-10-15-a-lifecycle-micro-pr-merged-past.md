@@ -36,7 +36,7 @@ This is also the likeliest answer to the open question of who merged #1667, #166
 
 Decided by the maintainer on 2026-10-15 (issue #1737, comment of that date).
 
-- **A rejected push retries; there is no micro-PR.** A lifecycle write runs on a disposable branch cut from the fetched default branch. When its push is rejected, the ladder fetches again, re-cuts the branch, re-applies the same write, and pushes again, up to a fixed number of attempts with a short jittered wait. After the last attempt it refuses with the attempt count and writes nothing. The micro-PR fallback in `ladder.ts:155-177` is removed, and with it the `plot/review` status the ladder writes on its own PR: a review status from a process that reviewed nothing is not a review. The race that started this (nine release records pushed at once, 2026-10-15) ends with every write landing, one after another.
+- **A rejected push retries; there is no micro-PR.** A lifecycle write runs on a disposable branch cut from the fetched default branch. When its push is rejected, the ladder fetches again, re-cuts the branch, re-applies the same write, and pushes again, up to five attempts with a jittered wait of 2 to 10 seconds. After the last attempt it refuses with the attempt count and writes nothing. The micro-PR fallback in `ladder.ts:155-177` is removed, and with it the `plot/review` status the ladder writes on its own PR: a review status from a process that reviewed nothing is not a review. The race that started this (nine release records pushed at once, 2026-10-15) ends with every write landing, one after another.
 - **Plot's tooling gets no bypass for merges.** Every pull-request merge Plot performs (`plot-ask.mjs merge`, the approve controller's plan-PR merge, any `pr-merge` caller) runs with a credential that is not on the ruleset's bypass list. The maintainer's own break-glass is unchanged: an admin merge with a `review-bypass: <reason>` comment, which `/plot-reconcile` reports.
 - **`pr-merge` is pinned on GitHub.** `plot-host.sh pr-merge` exits 1 on GitHub without `--match-head <sha>`. Every caller passes the head SHA its checks were read on. Bitbucket keeps its named refusal (exit 4) when a pin is asked for, because its host cannot pin a merge.
 
@@ -47,15 +47,15 @@ The first two decisions pull against each other. A lifecycle write is a direct p
 **Recommended answer: two identities with one job each.**
 
 - **Lifecycle writer:** a narrow GitHub App on the bypass list, set up like `plot-board-builder` (which pushes the built bundles today), with `Contents: write` only. The ladder pushes plan, sprint and index writes with its installation token, minted the way `plot-commit-status.mjs` mints the review App's. It never merges a pull request.
-- **Merger:** a credential that is not on the bypass list, for example a fine-grained token of a non-admin account with `Contents: write` and `Pull requests: write` on this repository. A merge by it passes only when `validate` and `plot/review` are green on the pinned head.
+- **Merger:** a third narrow GitHub App, not on the bypass list, with `Contents: write` and `Pull requests: write`. A merge by it passes only when `validate` and `plot/review` are green on the pinned head.
 
 A credential holding both jobs would be on the bypass list and could merge past the gate, so this plan does not offer one.
 
-### Open Questions
+### Answered
 
-- [ ] Confirm the two-identity split above, or name the alternative: lifecycle writes through pull requests that the merger merges after CI, which costs one CI run per write.
-- [ ] Which account holds the merger credential, and where does its key or token live (outside the repository, named by a Plot Config key as `Review app` is)?
-- [ ] How many push attempts before a lifecycle write refuses, and how long a wait between them?
+- **Two identities: confirmed** (maintainer, 2026-10-15). The writer App pushes lifecycle writes; the merger merges pull requests.
+- **The merger is a third narrow App** (maintainer, 2026-10-15): `Contents: write` and `Pull requests: write`, on no bypass list, its key under `~/.config/plot/` and named by a Plot Config key as `Review app` is. Its merges show as `<app>[bot]`.
+- **Five push attempts, 2 to 10 seconds apart with jitter** (maintainer, 2026-10-15), about 30 seconds at worst before a lifecycle write refuses.
 
 ## Slices
 
