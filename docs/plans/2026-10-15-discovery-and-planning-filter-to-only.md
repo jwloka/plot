@@ -83,7 +83,7 @@ The change has three parts, in the order the layering rule gives.
 
 ### The control
 
-- `feature/discovery-filters-to-only-my-work` — the Discovery checkbox, `lanesForReader` ahead of `lanesForTopic`, the topic counts and the empty-lane sentence, and one browser test with a stubbed payload. <!-- waits: feature/a-plan-card-names-its-owners --> <!-- builds: lanesForReader, the Discovery filter over story lanes and tickets -->
+- `feature/discovery-filters-to-only-my-work` → #1789 — the Discovery checkbox, `lanesForReader` ahead of `lanesForTopic`, the topic counts and the empty-lane sentence, and one browser test with a stubbed payload. <!-- waits: feature/a-plan-card-names-its-owners --> <!-- builds: lanesForReader, the Discovery filter over story lanes and tickets -->
 
 ## Notes
 
