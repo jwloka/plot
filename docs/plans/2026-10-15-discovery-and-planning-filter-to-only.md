@@ -11,6 +11,7 @@
 - **Impl:** own branches
 - **Approved:** 2026-10-15, Jan Wloka, plan-PR #1755 merged
 - **Started:** 2026-10-15, Jan Wloka, `feature/ownership-reads-story-authors`
+- **Started:** 2026-10-15, Jan Wloka, `feature/a-plan-card-names-its-owners`
 
 ## Changelog
 
