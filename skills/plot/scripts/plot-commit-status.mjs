@@ -16,26 +16,23 @@
 // names a SECOND App, with no branch-protection bypass: the build App's key
 // lives only in Actions secrets.
 //
-// The exchange GitHub documents for an App: an RS256 JWT with `iss` = the App
+// The exchange GitHub documents for an App — an RS256 JWT with `iss` = the App
 // id authenticates GET /repos/{owner}/{repo}/installation and POST
 // /app/installations/{id}/access_tokens; the installation token from the
-// second call authenticates POST /repos/{owner}/{repo}/statuses/{sha}. The
-// statuses API rejects a bare App JWT.
+// second call authenticates POST /repos/{owner}/{repo}/statuses/{sha} (the
+// statuses API rejects a bare App JWT) — lives in `plot-github-app-token.mjs`,
+// shared with the writer and merger Apps' exchanges.
 //
 // NO CREDENTIAL LEAVES THIS PROCESS except in a request header. The JWT and the
 // installation token travel through `fetch`, never through a child's argv
 // (which `ps` shows every local user), a file, stderr or a log.
-//
-// `GITHUB_API_URL` sets the API base, as it does on Actions and for GitHub
-// Enterprise Server; it defaults to https://api.github.com.
 import { execFileSync } from 'node:child_process';
-import { createSign } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { call, installationToken } from './plot-github-app-token.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const api = (process.env.GITHUB_API_URL || 'https://api.github.com').replace(/\/+$/, '');
 
 const refuse = (code, message) => {
   process.stderr.write(`plot-host: commit-status — ${message}\n`);
@@ -65,37 +62,6 @@ const reviewApp = () => {
   return { appId, keyPath };
 };
 
-const b64url = (text) => Buffer.from(text).toString('base64url');
-
-/** An App JWT: `iat` 60 s back for clock drift, `exp` under GitHub's 10-minute ceiling. */
-const appJwt = ({ appId, keyPath }) => {
-  const now = Math.floor(Date.now() / 1000);
-  const input = `${b64url('{"alg":"RS256","typ":"JWT"}')}.${b64url(JSON.stringify({ iat: now - 60, exp: now + 540, iss: appId }))}`;
-  try {
-    return `${input}.${createSign('RSA-SHA256').update(input).sign(fs.readFileSync(keyPath)).toString('base64url')}`;
-  } catch {
-    return refuse(3, `could not sign a JWT for App ${appId}`);
-  }
-};
-
-/** One GitHub API call; resolves to `{ status, body }`, status 0 where the request never completed. */
-const call = async (credential, method, route, body) => {
-  try {
-    const res = await fetch(`${api}/${route}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${credential}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    return { status: res.status, body: await res.json().catch(() => ({})) };
-  } catch {
-    return { status: 0, body: {} };
-  }
-};
-
 const [mode, ...rest] = process.argv.slice(2);
 const repo = mode === '--repo' ? rest.shift() : undefined;
 const [sha, state, context, description, targetUrl] = rest;
@@ -106,14 +72,14 @@ const app = reviewApp();
 if (mode === '--check') process.exit(0);
 if (!repo) refuse(3, 'could not resolve owner/repo from the current checkout');
 
-const jwt = appJwt(app);
-const installation = await call(jwt, 'GET', `repos/${repo}/installation`);
-if (!installation.body.id) refuse(3, `App ${app.appId} has no installation on ${repo} (HTTP ${installation.status})`);
+let token;
+try {
+  token = await installationToken(app, repo);
+} catch (err) {
+  refuse(3, err.message);
+}
 
-const minted = await call(jwt, 'POST', `app/installations/${installation.body.id}/access_tokens`);
-if (!minted.body.token) refuse(3, `could not mint an installation token for App ${app.appId} (HTTP ${minted.status})`);
-
-const write = await call(minted.body.token, 'POST', `repos/${repo}/statuses/${sha}`, {
+const write = await call(token, 'POST', `repos/${repo}/statuses/${sha}`, {
   state,
   context,
   description,

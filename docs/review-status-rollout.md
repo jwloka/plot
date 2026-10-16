@@ -6,6 +6,12 @@ the gate; this page is the one-time human setup — creating the App, storing
 its key, and switching the branch rule on — for a repository adopting it and
 for this repository's own rollout.
 
+A required check is only as good as the identity that can still merge past
+it. `docs/lifecycle-identities-rollout.md` covers that half: the Writer App
+and the Merger App that replace the maintainer's own `gh` identity on the
+lifecycle's push and merge paths, reusing the same App-token exchange this
+page's `Review app` uses.
+
 ## What writes the status today
 
 Three call sites write `plot/review` once a PR's head is ready to merge:

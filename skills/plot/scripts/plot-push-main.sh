@@ -95,11 +95,17 @@ git rev-parse --git-dir >/dev/null 2>&1 || {
   exit 1
 }
 
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # stderr is captured rather than passed through, because it carries the ONLY
 # signal that separates a bypass from a clean push. A call site ending in
 # `2>/dev/null` — as several of Plot's pushes do — discards exactly the line
 # that answers the question.
-err=$(git push origin "$branch:$default" 2>&1 >/dev/null)
+#
+# The push itself runs as the `Writer app` GitHub App installation, never the
+# ambient git identity — plot-writer-push.mjs resolves that key and refuses
+# (no push attempted) before any `git push` runs if it is missing or invalid.
+err=$(node "$here/plot-writer-push.mjs" "$branch" "$default" 2>&1 >/dev/null)
 code=$?
 
 status=$(classify "$code" "$err")

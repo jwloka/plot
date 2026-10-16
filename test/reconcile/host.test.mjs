@@ -2,9 +2,11 @@
 // Uses PATH-stubbed gh/bb executables: each stub records its argv and emits
 // canned JSON, so the tests pin (a) backend resolution and (b) the exact
 // argument mapping + output normalization per backend, fully offline.
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
+import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, existsSync, rmSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,11 +60,15 @@ function makeStubs({ ghJson = '{}', bbJson = '{}', ghFail = null, bbFail = null 
   const dir = trackTemp(mkdtempSync(path.join(tmpdir(), 'plot-host-')));
   const ghStub = (json, fail) => {
     const argvFile = path.join(dir, 'gh.argv');
+    // `repo view` answers the merger-token helper's owner/repo lookup without
+    // touching argvFile — a pr-merge test's assertion on `gh.argv` is about the
+    // MERGE call, and a `repo view` call recorded there first would clobber it.
+    const repoViewArm = `if [ "$1" = "repo" ] && [ "$2" = "view" ]; then echo "octo/repo"; exit 0; fi\n`;
     const body = fail != null
-      ? `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${argvFile}"\n` +
+      ? `#!/usr/bin/env bash\n${repoViewArm}printf '%s\\n' "$@" > "${argvFile}"\n` +
         (fail === '' ? '' : `printf '%s\\n' '${fail.replace(/'/g, `'\\''`)}' >&2\n`) +
         `exit 1\n`
-      : `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${argvFile}"\n` +
+      : `#!/usr/bin/env bash\n${repoViewArm}printf '%s\\n' "$@" > "${argvFile}"\n` +
         `printf '%s' '${json.replace(/'/g, `'\\''`)}'\n`;
     writeFileSync(path.join(dir, 'gh'), body);
     chmodSync(path.join(dir, 'gh'), 0o755);
@@ -96,6 +102,50 @@ printf '%s' '${json.replace(/'/g, `'\\''`)}'
     return argvFile;
   };
   return { dir, ghArgv: ghStub(ghJson, ghFail), bbArgv: bbStub(bbJson, bbFail) };
+}
+
+// `pr-merge`'s GitHub arm now mints a `Merger app` installation token before
+// calling `gh`. These tests exercise that call for real — a scratch repo
+// (`plot-config.sh` resolves `## Plot Config` from `git rev-parse
+// --show-toplevel`, so this cannot run against this suite's own checkout),
+// a throwaway RSA key, and a fake GitHub App token endpoint answering the
+// same two routes `installationToken` always calls.
+const mergerServers = [];
+after(() => {
+  for (const server of mergerServers) server.close();
+});
+function withMergerApp(stubs) {
+  const repoRoot = trackTemp(mkdtempSync(path.join(tmpdir(), 'plot-host-merger-')));
+  execFileSync('git', ['init', '-q', repoRoot]);
+  const keyPath = path.join(repoRoot, 'merger-app-key.pem');
+  const { privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  });
+  writeFileSync(keyPath, privateKey, { mode: 0o600 });
+  writeFileSync(path.join(repoRoot, 'CLAUDE.md'), `## Plot Config\n\n- **Merger app:** 654321 ${keyPath}\n`);
+
+  const server = createServer((req, res) => {
+    const reply = (code, json) => {
+      res.writeHead(code, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(json));
+    };
+    if (req.method === 'GET' && req.url === '/repos/octo/repo/installation') return reply(200, { id: 777 });
+    if (req.method === 'POST' && req.url === '/app/installations/777/access_tokens') {
+      return reply(201, { token: 'merger-installation-token' });
+    }
+    return reply(404, { message: 'unexpected route' });
+  });
+  mergerServers.push(server);
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      resolve({
+        cwd: repoRoot,
+        env: { GITHUB_API_URL: `http://127.0.0.1:${server.address().port}` },
+      });
+    });
+  });
 }
 
 // A `bb` stub that REFUSES what the real `bb` refuses. The permissive stub above
@@ -275,9 +325,10 @@ const budgetEnvFor = (stubs) => ({
   PLOT_BUDGET_ACCOUNT: BUDGET_ACCOUNT,
 });
 
-function runAllowFail(args, { env = {}, stubs }) {
+function runAllowFail(args, { env = {}, stubs, cwd }) {
   const res = spawnSync('bash', [adapter, ...args], {
     encoding: 'utf8',
+    cwd,
     env: {
       ...process.env,
       PATH: `${stubs.dir}:${process.env.PATH}`,
@@ -288,15 +339,67 @@ function runAllowFail(args, { env = {}, stubs }) {
   return { code: res.status, stdout: res.stdout, stderr: res.stderr };
 }
 
-function run(args, { env = {}, stubs }) {
+function run(args, { env = {}, stubs, cwd }) {
   return execFileSync('bash', [adapter, ...args], {
     encoding: 'utf8',
+    cwd,
     env: {
       ...process.env,
       PATH: `${stubs.dir}:${process.env.PATH}`,
       ...budgetEnvFor(stubs),
       ...env,
     },
+  });
+}
+
+// `run`/`runAllowFail` block the event loop for the child's whole lifetime —
+// fine for every other case here, because nothing in-process has to answer
+// the child while it runs. A `withMergerApp` case is different: the child's
+// grandchild (`plot-merger-token.mjs`) `fetch`es THIS PROCESS's own fake
+// GitHub server, which cannot accept that connection while the loop is
+// blocked. Measured: `execFileSync`/`spawnSync` deadlock here forever, not a
+// slow pass — the child's request never arrives, because nothing turns the
+// loop to service it. `spawn` is the fix, not a `timeout` tuned around it.
+function runAsync(args, { env = {}, stubs, cwd }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('bash', [adapter, ...args], {
+      cwd,
+      env: {
+        ...process.env,
+        PATH: `${stubs.dir}:${process.env.PATH}`,
+        ...budgetEnvFor(stubs),
+        ...env,
+      },
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`bash ${adapter} ${args.join(' ')} exited ${code}\n${stderr}`));
+      resolve(stdout);
+    });
+  });
+}
+
+function runAllowFailAsync(args, { env = {}, stubs, cwd }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('bash', [adapter, ...args], {
+      cwd,
+      env: {
+        ...process.env,
+        PATH: `${stubs.dir}:${process.env.PATH}`,
+        ...budgetEnvFor(stubs),
+        ...env,
+      },
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.on('error', reject);
+    child.on('close', (code) => resolve({ code, stdout, stderr }));
   });
 }
 
@@ -408,31 +511,97 @@ for (const [rollup, word] of CHECK_FOLD_CASES) {
   });
 }
 
-test('host: pr-merge github pins the merge with --match-head-commit', () => {
+test('host: pr-merge github pins the merge with --match-head-commit', async () => {
   const sha = 'a'.repeat(40);
   const stubs = makeStubs();
-  run(['pr-merge', '5', '--match-head', sha], { env: { PLOT_HOST: 'github' }, stubs });
+  const merger = await withMergerApp(stubs);
+  await runAsync(['pr-merge', '5', '--match-head', sha],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
   assert.deepEqual(argvOf(stubs.ghArgv), ['pr', 'merge', '5', '--merge', '--match-head-commit', sha]);
 });
 
 // THE STUB FAILS ONLY WHEN THE PIN DOES NOT NAME ITS HEAD. A stub that failed
 // every call passed whatever `--match-head-commit` carried, so a pin dropped or
 // altered in `plot-host.sh` left this test green for the wrong reason.
-test('host: pr-merge github surfaces a host that rejects a moved head, and merges nothing', () => {
+test('host: pr-merge github surfaces a host that rejects a moved head, and merges nothing', async () => {
   const head = 'a'.repeat(40);
   const stubs = makeStubs();
+  const merger = await withMergerApp(stubs);
   writeFileSync(path.join(stubs.dir, 'gh'),
-    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > "${stubs.ghArgv}"\n` +
+    `#!/usr/bin/env bash\nif [ "$1" = "repo" ] && [ "$2" = "view" ]; then echo "octo/repo"; exit 0; fi\n` +
+    `printf '%s\\n' "$@" > "${stubs.ghArgv}"\n` +
     `pinned=""\nwhile [ $# -gt 0 ]; do [ "$1" = "--match-head-commit" ] && pinned="$2"; shift; done\n` +
     `if [ "$pinned" != "${head}" ]; then echo 'Head branch was modified. Review and try the merge again.' >&2; exit 1; fi\n`);
   chmodSync(path.join(stubs.dir, 'gh'), 0o755);
-  const res = runAllowFail(['pr-merge', '5', '--match-head', 'b'.repeat(40)],
-    { env: { PLOT_HOST: 'github' }, stubs });
+  const res = await runAllowFailAsync(['pr-merge', '5', '--match-head', 'b'.repeat(40)],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
   assert.notEqual(res.code, 0);
   assert.match(res.stderr, /Head branch was modified/);
   assert.equal(argvOf(stubs.ghArgv).at(-1), 'b'.repeat(40), 'the pin reached gh');
-  const ok = runAllowFail(['pr-merge', '5', '--match-head', head], { env: { PLOT_HOST: 'github' }, stubs });
+  const ok = await runAllowFailAsync(['pr-merge', '5', '--match-head', head],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
   assert.equal(ok.code, 0, 'the same stub merges when the pin names its head');
+});
+
+// NO `Merger app` KEY MEANS NO MERGE CALL, NOT JUST A NON-ZERO EXIT. A naive
+// refusal could still let `gh pr merge` run and merge unauthenticated before
+// reporting failure. `plot-merger-token.mjs` exits 4 before `plot-host.sh`
+// ever builds the `pr merge` argv, so `gh.argv` — written only by the merge
+// call itself, never by the `repo view` lookup ahead of it — must stay absent.
+test('host: pr-merge github with no Merger app key refuses, and gh never merges', async () => {
+  const sha = 'a'.repeat(40);
+  const stubs = makeStubs();
+  const repoRoot = trackTemp(mkdtempSync(path.join(tmpdir(), 'plot-host-merger-nokey-')));
+  execFileSync('git', ['init', '-q', repoRoot]);
+  writeFileSync(path.join(repoRoot, 'CLAUDE.md'), '## Plot Config\n\n');
+  const res = await runAllowFailAsync(['pr-merge', '5', '--match-head', sha],
+    { env: { PLOT_HOST: 'github' }, stubs, cwd: repoRoot });
+  assert.notEqual(res.code, 0);
+  assert.match(res.stderr, /Merger app/);
+  assert.equal(argvOf(stubs.ghArgv), null, 'gh pr merge was never called');
+});
+
+// THE TOKEN REACHES `gh` ONLY THROUGH ITS ENVIRONMENT. `GH_TOKEN` is set for
+// this one call and nowhere else; `gh`'s own argv — the file `pr merge`
+// writes to — must never carry it, matching the same proof already made for
+// the Writer app's token in host-writer-push.test.mjs.
+test('host: pr-merge github gives gh the installation token via GH_TOKEN, never its argv', async () => {
+  const sha = 'a'.repeat(40);
+  const stubs = makeStubs();
+  const merger = await withMergerApp(stubs);
+  const envDump = path.join(stubs.dir, 'gh-env-dump');
+  writeFileSync(path.join(stubs.dir, 'gh'),
+    `#!/usr/bin/env bash\nif [ "$1" = "repo" ] && [ "$2" = "view" ]; then echo "octo/repo"; exit 0; fi\n` +
+    `printf '%s\\n' "$@" > "${stubs.ghArgv}"\n` +
+    `printf 'GH_TOKEN=%s\\n' "$GH_TOKEN" > "${envDump}"\n`);
+  chmodSync(path.join(stubs.dir, 'gh'), 0o755);
+  const res = await runAllowFailAsync(['pr-merge', '5', '--match-head', sha],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
+  assert.equal(res.code, 0, res.stderr);
+  const argv = argvOf(stubs.ghArgv).join(' ');
+  assert.ok(!argv.includes('merger-installation-token'), 'the token appeared in gh argv');
+  assert.ok(!res.stdout.includes('merger-installation-token'), 'the token reached stdout');
+  assert.ok(!res.stderr.includes('merger-installation-token'), 'the token reached stderr');
+  assert.equal(readFileSync(envDump, 'utf8').trim(), 'GH_TOKEN=merger-installation-token',
+    'gh received the token only via its environment');
+});
+
+// TWO JOBS ON ONE CREDENTIAL IS FORBIDDEN, exercised through the real
+// `pr-merge` entry point rather than a unit test of plot-app-key.mjs alone —
+// the mirror of host-writer-push.test.mjs's own sibling-collision test for
+// the Writer app.
+test('host: pr-merge github refuses when Merger app names the same App id as Writer app, and gh never merges', async () => {
+  const sha = 'a'.repeat(40);
+  const stubs = makeStubs();
+  const merger = await withMergerApp(stubs);
+  const keyPath = path.join(merger.cwd, 'merger-app-key.pem');
+  writeFileSync(path.join(merger.cwd, 'CLAUDE.md'),
+    `## Plot Config\n\n- **Merger app:** 654321 ${keyPath}\n- **Writer app:** 654321 ${keyPath}\n`);
+  const res = await runAllowFailAsync(['pr-merge', '5', '--match-head', sha],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
+  assert.notEqual(res.code, 0);
+  assert.match(res.stderr, /Merger app.*Writer app|Writer app.*Merger app/);
+  assert.equal(argvOf(stubs.ghArgv), null, 'gh pr merge was never called');
 });
 
 test('host: pr-merge bitbucket refuses a pin and calls no bb', () => {
@@ -643,13 +812,17 @@ test('host: pr-create bitbucket uses bb with same surface', () => {
   assert.deepEqual(argvOf(stubs.bbArgv), ['pr', 'create', '--title', 'T', '--body', '', '--draft']);
 });
 
-test('host: pr-merge github defaults to --merge, maps --squash/--delete-branch, both pinned', () => {
+test('host: pr-merge github defaults to --merge, maps --squash/--delete-branch, both pinned', async () => {
   const sha = 'a'.repeat(40);
   const stubs = makeStubs();
-  run(['pr-merge', '5', '--squash', '--delete-branch', '--match-head', sha], { env: { PLOT_HOST: 'github' }, stubs });
+  const merger = await withMergerApp(stubs);
+  await runAsync(['pr-merge', '5', '--squash', '--delete-branch', '--match-head', sha],
+    { env: { PLOT_HOST: 'github', ...merger.env }, stubs, cwd: merger.cwd });
   assert.deepEqual(argvOf(stubs.ghArgv), ['pr', 'merge', '5', '--squash', '--delete-branch', '--match-head-commit', sha]);
   const stubs2 = makeStubs();
-  run(['pr-merge', '5', '--match-head', sha], { env: { PLOT_HOST: 'github' }, stubs: stubs2 });
+  const merger2 = await withMergerApp(stubs2);
+  await runAsync(['pr-merge', '5', '--match-head', sha],
+    { env: { PLOT_HOST: 'github', ...merger2.env }, stubs: stubs2, cwd: merger2.cwd });
   assert.deepEqual(argvOf(stubs2.ghArgv), ['pr', 'merge', '5', '--merge', '--match-head-commit', sha]);
 });
 

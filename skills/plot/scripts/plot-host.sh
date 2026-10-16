@@ -3885,10 +3885,17 @@ case "$op" in
     done
     if [ "$be" = "github" ] && [ -z "$pin" ]; then echo "plot-host: pr-merge: github needs --match-head <sha>; nothing was merged" >&2; exit 1
     elif [ "$be" = "github" ]; then
+      # The merge runs as the `Merger app` installation, never the ambient `gh`
+      # identity. plot-merger-token.mjs resolves that key and refuses — no
+      # `gh pr merge` call attempted — before any merge happens if it is
+      # missing or invalid. The token reaches `gh` only through GH_TOKEN, set
+      # in this one call's environment, never on the command line.
+      repo="$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)"
+      merger_token="$(node "$here/plot-merger-token.mjs" "$repo")" || exit $?
       args=(pr merge "$num")
       [ "$squash" = 1 ] && args+=(--squash) || args+=(--merge)
       [ "$delbranch" = 1 ] && args+=(--delete-branch)
-      gh "${args[@]}" --match-head-commit "$pin"
+      GH_TOKEN="$merger_token" gh "${args[@]}" --match-head-commit "$pin"
     elif [ -n "$pin" ]; then echo "plot-host: pr-merge --match-head: bitbucket cannot pin a merge to a commit; nothing was merged" >&2; exit 4
     else
       args=(pr merge "$num")
